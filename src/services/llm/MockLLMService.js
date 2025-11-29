@@ -2,19 +2,9 @@
  * Mock LLM Service for Development/Testing
  * 
  * This service simulates LLM streaming behavior without making actual API calls.
- * Use this during development to test UI responsiveness and streaming effects.
- * 
- * Features:
- * - Simulated latency (thinking state)
- * - Character-by-character streaming
- * - Special command triggers:
- *   - /draw -> Returns component trigger for TarotCard
- *   - /error or /error-mystical -> Throws mystical error
- *   - /error-network -> Simulates network error
- *   - /error-timeout -> Simulates timeout error
- *   - /error-stream -> Simulates mid-stream error
- *   - /error-rate -> Simulates rate limit error
  */
+
+import { drawRandomCard, drawMultipleCards } from '../../utils/tarotUtils'
 
 class MockLLMService {
   constructor(options = {}) {
@@ -41,15 +31,89 @@ class MockLLMService {
     const command = userMessage.trim().toLowerCase();
 
     // Check for special commands
-    if (command === '/draw') {
-      // Yield component trigger for TarotCard
+    if (command === '/draw' || command === '/card') {
+      // Yield component trigger for single TarotCard with random card
+      const randomCard = drawRandomCard()
       yield {
         type: 'component',
         componentName: 'TarotCard',
         data: {
-          cardName: 'The Fool',
-          description: 'New beginnings, innocence, spontaneity',
-          imageUrl: '/cards/the-fool.jpg'
+          cardName: randomCard.cardName,
+          orientation: randomCard.orientation,
+          isRevealed: true
+        }
+      };
+      return;
+    }
+
+    if (command === '/draw-reversed' || command === '/card-reversed') {
+      // Yield reversed tarot card (force reversed orientation)
+      const randomCard = drawRandomCard()
+      yield {
+        type: 'component',
+        componentName: 'TarotCard',
+        data: {
+          cardName: randomCard.cardName,
+          orientation: 'reversed',
+          isRevealed: true
+        }
+      };
+      return;
+    }
+
+    if (command === '/spread' || command === '/spread-three') {
+      // Yield three-card spread with random cards
+      const randomCards = drawMultipleCards(3)
+      yield {
+        type: 'component',
+        componentName: 'TarotSpread',
+        data: {
+          spreadType: 'three-card',
+          cards: randomCards,
+          autoReveal: true,
+          revealDelay: 500
+        }
+      };
+      return;
+    }
+
+    if (command === '/spread-celtic' || command === '/celtic-cross') {
+      // Yield Celtic Cross spread with random cards
+      const randomCards = drawMultipleCards(10)
+      yield {
+        type: 'component',
+        componentName: 'TarotSpread',
+        data: {
+          spreadType: 'celtic-cross',
+          cards: randomCards,
+          autoReveal: true,
+          revealDelay: 400
+        }
+      };
+      return;
+    }
+
+    if (command === '/deck') {
+      // Yield interactive deck
+      yield {
+        type: 'component',
+        componentName: 'TarotDeck',
+        data: {
+          mode: 'single',
+          count: 1
+        }
+      };
+      return;
+    }
+
+    if (command === '/deck-multiple') {
+      // Yield interactive deck for multiple cards
+      yield {
+        type: 'component',
+        componentName: 'TarotDeck',
+        data: {
+          mode: 'multiple',
+          count: 3
         }
       };
       return;

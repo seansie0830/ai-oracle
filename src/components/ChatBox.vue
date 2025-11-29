@@ -4,10 +4,14 @@ import MockLLMService from '@/services/llm/MockLLMService'
 import RealLLMService from '@/services/llm/RealLLMService'
 import APIKeyModal from './APIKeyModal.vue'
 import ErrorModal from './ErrorModal.vue'
+import TarotCard from './TarotCard.vue'
+import TarotSpread from './TarotSpread.vue'
+import TarotDeck from './TarotDeck.vue'
 import { useLLMConfigStore } from '@/stores/llmConfig'
 import { useChatStore } from '@/stores/chat'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import { storeToRefs } from 'pinia'
+import { tarotComponentRegistry, isValidComponent } from '@/utils/componentRegistry'
 
 // Store
 const llmConfig = useLLMConfigStore()
@@ -27,6 +31,7 @@ const showApiKeyModal = ref(false)
 // Initialize LLM service based on URL query param
 const urlParams = new URLSearchParams(window.location.search)
 const useMock = urlParams.has('mock')
+const deckDebugMode = urlParams.has('deck') // Enable tarot components in debug mode
 
 const llmService = useMock 
   ? new MockLLMService({ thinkingDelay: 1200, charDelay: 25 })
@@ -161,10 +166,14 @@ onMounted(() => {
   // Load persisted config if available
   llmConfig.loadFromStorage()
   
-  // Show welcome message
+  // Show welcome message with deck mode info
+  const welcomeText = deckDebugMode 
+    ? 'Welcome, seeker. I am the Mystic Oracle. Try /draw, /spread, or /deck to reveal tarot cards in debug mode.'
+    : 'Welcome, seeker. I am the Mystic Oracle. Ask me anything, or try /draw to reveal a tarot card.'
+  
   chatStore.addMessage({
     id: `msg-${messageIdCounter++}`,
-    text: 'Welcome, seeker. I am the Mystic Oracle. Ask me anything, or try /draw to reveal a tarot card.',
+    text: welcomeText,
     sender: 'oracle',
     type: 'text'
   })
@@ -268,7 +277,22 @@ onMounted(() => {
 
           <!-- Component Message with Divine Glow -->
           <div
-            v-else-if="message.type === 'component'"
+            v-else-if="message.type === 'component' && deckDebugMode && isValidComponent(message.componentName)"
+            class="glass-panel gilded-border divine-glow hover-lift rounded-3xl py-6 px-8"
+            :class="message.componentName === 'TarotSpread' || message.componentName === 'TarotDeck' ? 'max-w-4xl' : 'max-w-md'"
+          >
+            <component 
+              :is="tarotComponentRegistry[message.componentName]"
+              v-bind="message.data"
+            />
+            <p class="text-[var(--color-tertiary-celestial)] text-xs mt-5 opacity-70 tracking-wider text-center">
+              ✨ {{ message.componentName }} Component
+            </p>
+          </div>
+          
+          <!-- Fallback for component messages when deck mode is disabled -->
+          <div
+            v-else-if="message.type === 'component' && !deckDebugMode"
             class="glass-panel gilded-border divine-glow hover-lift rounded-3xl max-w-md py-6 px-8"
           >
             <div class="text-center">
@@ -277,11 +301,11 @@ onMounted(() => {
               </div>
               <p style="font-family: var(--font-family-display);" 
                  class="text-[var(--color-secondary-champagne-gold)] text-2xl mb-4 tracking-wide font-bold">
-                {{ message.data.cardName }}
+                {{ message.data.cardName || 'Tarot Component' }}
               </p>
               <p style="font-family: var(--font-family-serif);" 
                  class="text-[var(--color-text-secondary)] text-base italic leading-relaxed">
-                {{ message.data.description }}
+                {{ message.data.description || 'Enable deck mode by adding ?deck to URL' }}
               </p>
               <p class="text-[var(--color-tertiary-celestial)] text-xs mt-5 opacity-70 tracking-wider">
                 ✨ {{ message.componentName }} Component

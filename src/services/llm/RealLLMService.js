@@ -177,11 +177,35 @@ class RealLLMService {
                     if (lastMessage._getType() === 'tool') {
                         try {
                             const cards = JSON.parse(lastMessage.content);
-                            yield {
-                                type: 'component',
-                                componentName: 'TarotCard',
-                                data: { cards }
-                            };
+
+                            // Determine component type based on number of cards
+                            if (cards.length === 1) {
+                                // Single card - use TarotCard component
+                                yield {
+                                    type: 'component',
+                                    componentName: 'TarotCard',
+                                    data: {
+                                        cardName: cards[0].cardName,
+                                        orientation: cards[0].orientation,
+                                        isRevealed: true
+                                    }
+                                };
+                            } else {
+                                // Multiple cards - use TarotSpread component
+                                yield {
+                                    type: 'component',
+                                    componentName: 'TarotSpread',
+                                    data: {
+                                        spreadType: cards.length === 3 ? 'three-card' : 'celtic-cross',
+                                        cards: cards.map(c => ({
+                                            cardName: c.cardName,
+                                            orientation: c.orientation
+                                        })),
+                                        autoReveal: true,
+                                        revealDelay: 500
+                                    }
+                                };
+                            }
                         } catch (e) {
                             console.error("Failed to parse card data", e);
                         }
@@ -306,9 +330,10 @@ class RealLLMService {
                     const card = deckCopy.splice(randomIndex, 1)[0];
                     const isReversed = Math.random() < 0.3;
 
+                    // Use the same format as MockLLMService
                     drawnCards.push({
-                        name: card,
-                        orientation: isReversed ? "Reversed" : "Upright",
+                        cardName: card,  // Changed from 'name' to 'cardName'
+                        orientation: isReversed ? "reversed" : "upright",  // Lowercase to match mock
                         description: `The ${card} card, appearing ${isReversed ? "reversed" : "upright"}.`
                     });
                 }
