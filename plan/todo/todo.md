@@ -1,1 +1,2 @@
-- add the some background to override the default selection color
+- [x] Add clear chat button and history management
+- [ ] Add the some background to override the default selection color

@@ -11,6 +11,19 @@ Documentation for UI components and frontend logic.
 Documentation for backend services and business logic.
 - **[LLM Agent](./services/LLM_Agent.md)**: LangChain integration, agent persona, and tools.
 
+# Project Documentation & Plan
+
+## Directory Structure
+
+### [Components](./components/)
+Documentation for UI components and frontend logic.
+- **[ChatBox UI](./components/ChatBox_UI.md)**: Main chat interface and settings.
+- **[Tarot Components](./components/Tarot_Components.md)**: Visual components for cards, spreads, and decks.
+
+### [Services](./services/)
+Documentation for backend services and business logic.
+- **[LLM Agent](./services/LLM_Agent.md)**: LangChain integration, agent persona, and tools.
+
 ### [Global](./global/)
 Cross-cutting concerns and shared resources.
 - **[Theme & Design](./global/Theme.md)**: Color palettes, Tailwind config, and design tokens.
@@ -19,5 +32,6 @@ Cross-cutting concerns and shared resources.
 ## Architecture Overview
 The application follows a **Service-Component** architecture:
 1.  **UI Layer (Vue 3)**: `ChatBox` handles user interaction and renders `TarotComponents` based on data.
-2.  **Service Layer**: `LLMService` (Real or Mock) handles the intelligence and state.
-3.  **Global Theme**: Shared CSS variables and Tailwind classes ensure consistency.
+2.  **State Management (Pinia)**: `ChatStore` manages message history and synchronization between UI and services.
+3.  **Service Layer**: `LLMService` (Real or Mock) handles the intelligence and state.
+4.  **Global Theme**: Shared CSS variables and Tailwind classes ensure consistency.

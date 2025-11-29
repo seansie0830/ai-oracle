@@ -6,20 +6,6 @@ Create a Vue 3 component `ChatBox.vue` that serves as an interactive chat interf
 ## 1. Component Architecture
 
 We will create a new directory `src/components` if it doesn't exist.
-
-### Files
-- `src/components/ChatBox.vue`: The main outer component containing the chat logic and layout.
-- `src/components/TarotCard.vue` (Optional future expansion): To display drawn cards.
-
-### Structure of `ChatBox.vue`
-1.  **Header**: Title "Mystic Oracle" or similar, with a mystical icon.
-2.  **Chat Area**: A scrollable container for messages.
-    -   **User Message**: Aligned right, styled like a query slip.
-    -   **System/Oracle Message**: Aligned left, styled with a magical aura or parchment texture.
-    -   **Dynamic Content Slot**: A scoped slot or dynamic component renderer within the message loop. This allows the LLM to trigger the display of specific Vue components (like a `TarotCard` or `ReadingSpread`).
-
-3.  **Input Area**:
-    -   Text input field (styled as a magical slate or scroll).
     -   Send button (styled as a rune, crystal, or gold coin).
 
 ## 2. Design & Styling (The Tarot Theme)

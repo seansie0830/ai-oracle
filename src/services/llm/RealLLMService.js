@@ -4,6 +4,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import { useErrorHandler } from '@/composables/useErrorHandler';
 
 /**
  * Real LLM Service Implementation
@@ -30,6 +31,76 @@ class RealLLMService {
      */
     clearHistory() {
         this.history = [];
+    }
+
+    /**
+     * Fetches the list of available models from the specified provider
+     * @param {string} provider - The LLM provider (gemini, xai, groq, openrouter)
+     * @param {string} apiKey - The API key for the provider
+     * @returns {Promise<Array<{id: string, name: string}>>} List of models
+     */
+    static async fetchAvailableModels(provider, apiKey) {
+        if (!apiKey && provider !== 'openrouter') {
+            throw new Error("API Key is required to fetch models.");
+        }
+
+        try {
+            let models = [];
+
+            switch (provider) {
+                case 'gemini':
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                    if (!response.ok) throw new Error(`Gemini API Error: ${response.statusText}`);
+                    const data = await response.json();
+                    // Filter for 'generateContent' capable models and map
+                    models = data.models
+                        .filter(m => m.supportedGenerationMethods.includes("generateContent"))
+                        .map(m => ({
+                            id: m.name.replace("models/", ""), // Remove 'models/' prefix
+                            name: m.displayName
+                        }));
+                    break;
+
+                case 'xai':
+                case 'groq':
+                case 'openrouter':
+                    let baseUrl = "";
+                    if (provider === 'xai') baseUrl = "https://api.x.ai/v1/models";
+                    if (provider === 'groq') baseUrl = "https://api.groq.com/openai/v1/models";
+                    if (provider === 'openrouter') baseUrl = "https://openrouter.ai/api/v1/models";
+
+                    const headers = {
+                        "Content-Type": "application/json"
+                    };
+                    if (apiKey) {
+                        headers["Authorization"] = `Bearer ${apiKey}`;
+                    }
+
+                    const openAiResponse = await fetch(baseUrl, {
+                        headers: headers
+                    });
+
+                    if (!openAiResponse.ok) throw new Error(`${provider.toUpperCase()} API Error: ${openAiResponse.statusText}`);
+                    const openAiData = await openAiResponse.json();
+
+                    models = openAiData.data.map(m => ({
+                        id: m.id,
+                        name: m.id // OpenAI format usually just has ID, sometimes name is same
+                    }));
+                    break;
+
+                default:
+                    throw new Error(`Unsupported provider for fetching models: ${provider}`);
+            }
+
+            // Sort models alphabetically by name
+            models.sort((a, b) => a.name.localeCompare(b.name));
+
+            return models;
+        } catch (error) {
+            console.error(`Failed to fetch models for ${provider}:`, error);
+            throw error;
+        }
     }
 
     /**
@@ -116,6 +187,15 @@ class RealLLMService {
 
         } catch (error) {
             console.error("RealLLMService Error:", error);
+
+            // Trigger Error Modal via useErrorHandler
+            try {
+                const { handleLLMError } = useErrorHandler();
+                handleLLMError(error);
+            } catch (e) {
+                console.warn("Failed to trigger error modal:", e);
+            }
+
             yield { type: 'error', message: error.message || "An error occurred." };
         }
     }

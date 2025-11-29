@@ -1,51 +1,50 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useLLMConfigStore } from '@/stores/llmConfig'
+import RealLLMService from '@/services/llm/RealLLMService'
 
-// Props and Emits
 const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    default: false
-  }
+  isOpen: Boolean
 })
 
 const emit = defineEmits(['close', 'save'])
 
-// Store
 const llmConfig = useLLMConfigStore()
 
-// Local state
+// State
 const selectedProvider = ref(llmConfig.provider)
 const enteredKey = ref(llmConfig.apiKey)
 const selectedModel = ref(llmConfig.selectedModel)
+const persistKeys = ref(llmConfig.persistKeys)
 const showKey = ref(false)
-const trustDevice = ref(llmConfig.persistKeys)
-const showHelp = ref(false)
-const modelSearchQuery = ref('')
-const isModelDropdownOpen = ref(false)
+const isLoadingModels = ref(false)
+const fetchError = ref('')
 
-// Provider metadata
+// Providers Metadata
 const PROVIDERS = {
   gemini: {
+    id: 'gemini',
     label: 'Google Gemini',
     icon: '✨',
     placeholder: 'Enter your Gemini API key (AIza...)',
     helpUrl: 'https://aistudio.google.com/app/apikey'
   },
   xai: {
+    id: 'xai',
     label: 'xAI (Grok)',
     icon: '🚀',
     placeholder: 'Enter your xAI API key',
     helpUrl: 'https://x.ai/api'
   },
   groq: {
+    id: 'groq',
     label: 'Groq',
     icon: '⚡',
     placeholder: 'Enter your Groq API key',
     helpUrl: 'https://console.groq.com/keys'
   },
   openrouter: {
+    id: 'openrouter',
     label: 'OpenRouter',
     icon: '🔀',
     placeholder: 'Enter your OpenRouter API key',
@@ -56,501 +55,407 @@ const PROVIDERS = {
 // Computed
 const currentProvider = computed(() => PROVIDERS[selectedProvider.value])
 const availableModels = computed(() => llmConfig.availableModels)
-const filteredModels = computed(() => {
-  if (!modelSearchQuery.value) return availableModels.value
-  const query = modelSearchQuery.value.toLowerCase()
-  return availableModels.value.filter(model => 
-    model.name.toLowerCase().includes(query) || 
-    model.description.toLowerCase().includes(query) ||
-    model.id.toLowerCase().includes(query)
-  )
-})
-const selectedModelName = computed(() => {
-  const model = availableModels.value.find(m => m.id === selectedModel.value)
-  return model ? model.name : 'Select a model...'
-})
-const canSave = computed(() => enteredKey.value.trim().length > 0 && selectedModel.value.trim().length > 0)
+const hasModels = computed(() => availableModels.value && availableModels.value.length > 0)
 
-// Methods
-function selectProvider(provider) {
-  selectedProvider.value = provider
-  // Reset model selection when provider changes
-  selectedModel.value = ''
-  modelSearchQuery.value = ''
-}
+// Watchers
 
-function selectModel(modelId) {
-  selectedModel.value = modelId
-  isModelDropdownOpen.value = false
-  modelSearchQuery.value = ''
-}
-
-function toggleModelDropdown() {
-  isModelDropdownOpen.value = !isModelDropdownOpen.value
-  if (!isModelDropdownOpen.value) {
-    modelSearchQuery.value = ''
-  }
-}
-
-function toggleKeyVisibility() {
-  showKey.value = !showKey.value
-}
-
-function saveConfig() {
-  if (!canSave.value) return
-  
-  llmConfig.updateConfig(
-    selectedProvider.value,
-    enteredKey.value.trim(),
-    selectedModel.value,
-    trustDevice.value
-  )
-  
-  emit('save', {
-    provider: selectedProvider.value,
-    apiKey: enteredKey.value.trim(),
-    model: selectedModel.value,
-    persist: trustDevice.value
-  })
-  emit('close')
-}
-
-function cancel() {
-  // Reset to stored values
-  selectedProvider.value = llmConfig.provider
-  enteredKey.value = llmConfig.apiKey
-  selectedModel.value = llmConfig.selectedModel
-  trustDevice.value = llmConfig.persistKeys
-  isModelDropdownOpen.value = false
-  modelSearchQuery.value = ''
-  emit('close')
-}
-
-function handleBackdropClick(event) {
-  if (event.target === event.currentTarget) {
-    cancel()
-  }
-}
-
-function handleEscape(event) {
-  if (event.key === 'Escape') {
-    cancel()
-  }
-}
-
-// Watch for modal open to add/remove event listener
+// Reset state when modal opens
 watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
-    document.addEventListener('keydown', handleEscape)
-    // Load current values when opening
     selectedProvider.value = llmConfig.provider
     enteredKey.value = llmConfig.apiKey
     selectedModel.value = llmConfig.selectedModel
-    trustDevice.value = llmConfig.persistKeys
-    isModelDropdownOpen.value = false
-    modelSearchQuery.value = ''
-  } else {
-    document.removeEventListener('keydown', handleEscape)
+    persistKeys.value = llmConfig.persistKeys
+    fetchError.value = ''
+    
+    // If we have a key but no models, try fetching
+    if (enteredKey.value && (!availableModels.value || availableModels.value.length === 0)) {
+      fetchModels()
+    }
   }
 })
+
+// Watch provider change to clear models and key if needed (optional, maybe keep key if switching same provider type?)
+watch(selectedProvider, () => {
+  // Reset model selection on provider change
+  selectedModel.value = ''
+  llmConfig.setAvailableModels([]) // Clear models in store
+  fetchError.value = ''
+  
+  // If we have a key for this new provider (re-entered), fetch models
+  // Or if it's OpenRouter (public list)
+  if (enteredKey.value || selectedProvider.value === 'openrouter') {
+      fetchModels()
+  }
+})
+
+// Watch key to auto-fetch models
+let debounceTimer = null
+watch(enteredKey, (newKey) => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  
+  if (!newKey || newKey.length < 10) {
+    // OpenRouter allows public listing, so we can fetch without key
+    if (selectedProvider.value === 'openrouter') {
+      fetchModels()
+      return
+    }
+    llmConfig.setAvailableModels([])
+    return
+  }
+
+  debounceTimer = setTimeout(() => {
+    fetchModels()
+  }, 800) // Debounce fetch
+})
+
+async function fetchModels() {
+  // Allow OpenRouter to fetch without key
+  if (!enteredKey.value && selectedProvider.value !== 'openrouter') return
+  
+  isLoadingModels.value = true
+  fetchError.value = ''
+  
+  try {
+    const models = await RealLLMService.fetchAvailableModels(selectedProvider.value, enteredKey.value)
+    llmConfig.setAvailableModels(models)
+    
+    // Auto-select first model if none selected or current selection not in list
+    if (models.length > 0) {
+      const currentExists = models.find(m => m.id === selectedModel.value)
+      if (!currentExists) {
+        selectedModel.value = models[0].id
+      }
+    }
+  } catch (error) {
+    console.error("Failed to fetch models:", error)
+    fetchError.value = "Failed to fetch models. Check your API Key."
+    llmConfig.setAvailableModels([])
+  } finally {
+    isLoadingModels.value = false
+  }
+}
+
+const isDropdownOpen = ref(false)
+const searchQuery = ref('')
+const searchInputRef = ref(null)
+const dropdownRef = ref(null)
+
+const filteredModels = computed(() => {
+  if (!searchQuery.value) return availableModels.value
+  const query = searchQuery.value.toLowerCase()
+  return availableModels.value.filter(m => 
+    m.name.toLowerCase().includes(query) || 
+    m.id.toLowerCase().includes(query)
+  )
+})
+
+const selectedModelName = computed(() => {
+  const model = availableModels.value.find(m => m.id === selectedModel.value)
+  return model ? model.name : ''
+})
+
+function toggleDropdown() {
+  if (isLoadingModels.value || !hasModels.value) return
+  isDropdownOpen.value = !isDropdownOpen.value
+  if (isDropdownOpen.value) {
+    setTimeout(() => {
+      searchInputRef.value?.focus()
+    }, 100)
+  } else {
+    searchQuery.value = ''
+  }
+}
+
+function selectModel(model) {
+  selectedModel.value = model.id
+  isDropdownOpen.value = false
+  searchQuery.value = ''
+}
+
+// Close dropdown when clicking outside
+function handleClickOutside(event) {
+  if (dropdownRef.value && !dropdownRef.value.contains(event.target)) {
+    isDropdownOpen.value = false
+    searchQuery.value = ''
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+// Clean up listener (optional but good practice)
+// onUnmounted(() => {
+//   document.removeEventListener('click', handleClickOutside)
+// })
+
+function handleSave() {
+  if (!enteredKey.value) return
+  
+  llmConfig.updateConfig(
+    selectedProvider.value, 
+    enteredKey.value, 
+    selectedModel.value,
+    persistKeys.value
+  )
+  emit('save')
+}
+
+function handleClose() {
+  emit('close')
+}
 </script>
 
 <template>
-  <Transition name="modal">
-    <div
-      v-if="isOpen"
-      class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto
-             bg-[rgba(0,0,0,0.85)] backdrop-blur-lg px-4 py-8"
-      @click="handleBackdropClick"
-    >
+  <Transition name="modal-fade">
+    <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <!-- Backdrop -->
+      <div class="absolute inset-0 bg-[rgba(0,0,0,0.85)] backdrop-blur-lg" @click="handleClose"></div>
+
       <!-- Modal Panel -->
-      <div
-        class="glass-panel gilded-border divine-glow
-               w-full max-w-2xl rounded-3xl py-8 px-10 
-               transform transition-all duration-500 ease-out"
-        @click.stop
-      >
+      <div class="relative w-full max-w-lg glass-panel gilded-border 
+                  bg-gradient-to-br from-[rgba(45,20,60,0.9)] to-[rgba(20,10,30,0.95)]
+                  rounded-3xl shadow-[0_0_50px_rgba(157,78,221,0.2)]
+                  transform transition-all duration-300 flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar">
+        
         <!-- Header -->
-        <div class="flex items-start justify-between mb-6">
-          <div class="flex-1">
-            <h2 
-              style="font-family: var(--font-family-display);"
-              class="text-3xl font-black text-[var(--color-secondary-champagne-gold)] 
-                     tracking-[0.2em] uppercase mb-2"
-            >
-              ✦ Configure Your Oracle ✦
+        <div class="p-6 border-b border-[rgba(244,228,193,0.1)] flex justify-between items-start">
+          <div>
+            <h2 style="font-family: var(--font-family-display);" 
+                class="text-2xl text-[var(--color-secondary-champagne-gold)] tracking-[0.15em] uppercase font-bold">
+              Configure Oracle
             </h2>
-            <p 
-              style="font-family: var(--font-family-serif);"
-              class="text-[var(--color-text-tertiary)] text-sm italic"
-            >
-              Select your LLM provider and enter your API key
+            <p class="text-[var(--color-text-tertiary)] text-sm mt-1 font-light">
+              Select your provider and enter API key
             </p>
           </div>
-          
-          <!-- Close Button -->
-          <button
-            @click="cancel"
-            class="text-[var(--color-text-tertiary)] hover:text-[var(--color-secondary-champagne-gold)]
-                   transition-all duration-300 text-2xl ml-4 hover:rotate-90"
-            aria-label="Close modal"
-          >
-            ✕
+          <button @click="handleClose" 
+                  class="text-[var(--color-text-tertiary)] hover:text-[var(--color-secondary-rose-gold)] transition-colors text-2xl leading-none">
+            &times;
           </button>
         </div>
 
-        <!-- Provider Selection -->
-        <div class="mb-6">
-          <label 
-            style="font-family: var(--font-family-serif);"
-            class="block text-[var(--color-text-secondary)] text-lg font-light mb-3"
-          >
-            Choose Provider:
-          </label>
+        <!-- Content -->
+        <div class="p-8 space-y-8">
           
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <button
-              v-for="(provider, key) in PROVIDERS"
-              :key="key"
-              @click="selectProvider(key)"
-              class="rounded-2xl py-4 px-3 text-center transition-all duration-300 transform"
-              :class="selectedProvider === key 
-                ? 'border-4 border-[var(--color-secondary-champagne-gold)] bg-gradient-to-br from-[var(--color-primary-amethyst)]/40 to-[var(--color-primary-royal-purple)]/30 shadow-[0_0_50px_rgba(244,228,193,1),0_0_30px_rgba(244,228,193,0.7),0_0_15px_rgba(157,78,221,0.5)] scale-110 opacity-100 backdrop-blur-xl' 
-                : 'border border-[rgba(244,228,193,0.1)] bg-black/50 opacity-60 grayscale hover:opacity-80 hover:grayscale-0 hover:border-[rgba(244,228,193,0.25)] hover:scale-105 backdrop-blur-md'"
-            >
-              <div 
-                class="text-3xl mb-2 transition-transform duration-300"
-                :class="selectedProvider === key ? 'scale-125 drop-shadow-[0_0_12px_rgba(244,228,193,0.9)]' : ''"
+          <!-- Provider Selection -->
+          <div class="space-y-3">
+            <label class="text-[var(--color-text-secondary)] text-sm uppercase tracking-widest opacity-80">
+              Choose Provider
+            </label>
+            <div class="grid grid-cols-2 gap-3">
+              <button 
+                v-for="provider in PROVIDERS" 
+                :key="provider.id"
+                @click="selectedProvider = provider.id"
+                class="relative p-4 rounded-xl border transition-all duration-300 flex flex-col items-center gap-2 group"
+                :class="selectedProvider === provider.id 
+                  ? 'bg-[rgba(157,78,221,0.15)] border-[var(--color-secondary-champagne-gold)] shadow-[0_0_20px_rgba(157,78,221,0.3)]' 
+                  : 'bg-[rgba(255,255,255,0.03)] border-transparent hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(244,228,193,0.3)]'"
               >
-                {{ provider.icon }}
-              </div>
-              <div 
-                style="font-family: var(--font-family-sans);"
-                class="text-sm font-medium transition-colors duration-300"
-                :class="selectedProvider === key 
-                  ? 'text-[var(--color-secondary-champagne-gold)] font-black uppercase tracking-wider drop-shadow-[0_2px_10px_rgba(244,228,193,0.7)]' 
-                  : 'text-[var(--color-text-tertiary)]'"
-              >
-                {{ provider.label.split(' ')[0] }}
-              </div>
-            </button>
-          </div>
-        </div>
-
-        <!-- Model Selection -->
-        <div class="mb-6">
-          <label 
-            style="font-family: var(--font-family-serif);"
-            class="block text-[var(--color-text-secondary)] text-lg font-light mb-3"
-          >
-            Choose Model:
-          </label>
-          
-          <div class="relative">
-            <!-- Model Dropdown Button -->
-            <button
-              @click="toggleModelDropdown"
-              type="button"
-              class="w-full rounded-2xl glass-panel py-4 px-6 pr-12
-                     border-2 border-[rgba(244,228,193,0.25)]
-                     text-[var(--color-text-secondary)] text-base text-left
-                     hover:border-[rgba(244,228,193,0.5)]
-                     focus:outline-none focus:border-[rgba(244,228,193,0.5)]
-                     focus:shadow-[0_0_30px_rgba(157,78,221,0.4)]
-                     transition-all duration-500 ease-out"
-              style="font-family: var(--font-family-sans);"
-            >
-              <span :class="selectedModel ? '' : 'text-[var(--color-text-tertiary)]/40'">
-                {{ selectedModelName }}
-              </span>
-              <span class="absolute right-4 top-1/2 transform -translate-y-1/2 text-[var(--color-text-tertiary)] transition-transform duration-300"
-                    :class="isModelDropdownOpen ? 'rotate-180' : ''">
-                ▼
-              </span>
-            </button>
-
-            <!-- Dropdown Menu -->
-            <Transition name="dropdown">
-              <div
-                v-if="isModelDropdownOpen"
-                class="absolute z-10 w-full mt-2 rounded-2xl glass-panel 
-                       border-2 border-[rgba(244,228,193,0.25)]
-                       shadow-[0_0_50px_rgba(157,78,221,0.3)]
-                       overflow-hidden"
-              >
-                <!-- Search Input -->
-                <div class="p-3 border-b border-[rgba(244,228,193,0.15)]">
-                  <input
-                    v-model="modelSearchQuery"
-                    type="text"
-                    placeholder="Search models..."
-                    class="w-full rounded-xl glass-panel py-2 px-4
-                           border border-[rgba(244,228,193,0.15)]
-                           text-[var(--color-text-secondary)] text-sm
-                           placeholder-[var(--color-text-tertiary)]/40
-                           focus:outline-none focus:border-[rgba(244,228,193,0.35)]
-                           transition-all duration-300"
-                    style="font-family: var(--font-family-sans);"
-                    @click.stop
-                  />
-                </div>
-
-                <!-- Model List -->
-                <div class="max-h-64 overflow-y-auto custom-scrollbar">
-                  <button
-                    v-for="model in filteredModels"
-                    :key="model.id"
-                    @click="selectModel(model.id)"
-                    class="w-full text-left px-4 py-3 transition-all duration-300
-                           hover:bg-[rgba(244,228,193,0.1)]
-                           border-b border-[rgba(244,228,193,0.05)] last:border-b-0"
-                    :class="selectedModel === model.id ? 'bg-[rgba(244,228,193,0.15)]' : ''"
-                  >
-                    <div class="flex items-start gap-2">
-                      <span v-if="selectedModel === model.id" 
-                            class="text-[var(--color-secondary-champagne-gold)] text-lg mt-0.5">
-                        ✓
-                      </span>
-                      <div class="flex-1">
-                        <div 
-                          style="font-family: var(--font-family-sans);"
-                          class="text-[var(--color-text-secondary)] text-base font-medium"
-                          :class="selectedModel === model.id ? 'text-[var(--color-secondary-champagne-gold)]' : ''"
-                        >
-                          {{ model.name }}
-                        </div>
-                        <div 
-                          style="font-family: var(--font-family-sans);"
-                          class="text-[var(--color-text-tertiary)] text-xs mt-0.5"
-                        >
-                          {{ model.description }}
-                        </div>
-                        <div 
-                          style="font-family: var(--font-family-sans);"
-                          class="text-[var(--color-text-tertiary)]/50 text-xs mt-0.5 font-mono"
-                        >
-                          {{ model.id }}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                  
-                  <!-- No Results Message -->
-                  <div v-if="filteredModels.length === 0" 
-                       class="px-4 py-6 text-center text-[var(--color-text-tertiary)] text-sm"
-                       style="font-family: var(--font-family-sans);">
-                    No models found matching "{{ modelSearchQuery }}"
-                  </div>
-                </div>
-              </div>
-            </Transition>
-          </div>
-        </div>
-
-        <!-- API Key Input -->
-        <div class="mb-6">
-          <label 
-            style="font-family: var(--font-family-serif);"
-            class="block text-[var(--color-text-secondary)] text-lg font-light mb-3"
-          >
-            API Key:
-          </label>
-          
-          <div class="relative">
-            <input
-              v-model="enteredKey"
-              :type="showKey ? 'text' : 'password'"
-              :placeholder="currentProvider.placeholder"
-              class="w-full rounded-2xl glass-panel py-4 px-6 pr-14
-                     border-2 border-[rgba(244,228,193,0.25)]
-                     text-[var(--color-text-secondary)] text-base
-                     placeholder-[var(--color-text-tertiary)]/40
-                     focus:outline-none focus:border-[rgba(244,228,193,0.5)]
-                     focus:shadow-[0_0_30px_rgba(157,78,221,0.4)]
-                     transition-all duration-500 ease-out"
-              style="font-family: var(--font-family-sans);"
-            />
-            
-            <!-- Toggle Visibility Button -->
-            <button
-              @click="toggleKeyVisibility"
-              class="absolute right-4 top-1/2 transform -translate-y-1/2
-                     text-[var(--color-text-tertiary)] hover:text-[var(--color-secondary-champagne-gold)]
-                     transition-all duration-300 text-xl"
-              aria-label="Toggle key visibility"
-            >
-              {{ showKey ? '👁️' : '👁️‍🗨️' }}
-            </button>
-          </div>
-        </div>
-
-        <!-- Trust Device Checkbox -->
-        <div class="mb-6 glass-panel rounded-2xl py-4 px-6 border border-[rgba(244,228,193,0.15)]">
-          <label class="flex items-start gap-3 cursor-pointer">
-            <input
-              v-model="trustDevice"
-              type="checkbox"
-              class="mt-1 w-5 h-5 rounded border-2 border-[var(--color-secondary-champagne-gold)]
-                     bg-transparent checked:bg-[var(--color-primary-amethyst)]
-                     focus:ring-2 focus:ring-[var(--color-primary-amethyst)]
-                     transition-all duration-300 cursor-pointer"
-            />
-            <div class="flex-1">
-              <div 
-                style="font-family: var(--font-family-sans);"
-                class="text-[var(--color-text-secondary)] text-base font-medium"
-              >
-                Trust this device (persist API key)
-              </div>
-              <div 
-                style="font-family: var(--font-family-sans);"
-                class="text-[var(--color-tertiary-emerald)] text-sm mt-1 flex items-center gap-2"
-              >
-                <span>⚠️</span>
-                <span>Only enable on your personal, secure device</span>
-              </div>
+                <span class="text-2xl filter drop-shadow-lg">{{ provider.icon }}</span>
+                <span class="text-sm font-medium text-[var(--color-text-primary)]">{{ provider.label }}</span>
+                
+                <!-- Active Indicator -->
+                <div v-if="selectedProvider === provider.id" 
+                     class="absolute top-2 right-2 w-2 h-2 rounded-full bg-[var(--color-tertiary-emerald)] shadow-[0_0_8px_var(--color-tertiary-emerald)]"></div>
+              </button>
             </div>
-          </label>
-        </div>
+          </div>
 
-        <!-- Help Section -->
-        <div class="mb-6">
-          <button
-            @click="showHelp = !showHelp"
-            class="text-[var(--color-text-tertiary)] hover:text-[var(--color-secondary-champagne-gold)]
-                   transition-all duration-300 text-sm flex items-center gap-2"
-            style="font-family: var(--font-family-sans);"
-          >
-            <span>{{ showHelp ? '▼' : '▶' }}</span>
-            <span>How to get your API key</span>
-          </button>
-          
-          <Transition name="slide">
-            <div
-              v-if="showHelp"
-              class="mt-3 glass-panel rounded-2xl py-3 px-5 border border-[rgba(244,228,193,0.15)]"
-            >
-              <a
-                :href="currentProvider.helpUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="text-[var(--color-tertiary-sapphire)] hover:text-[var(--color-secondary-champagne-gold)]
-                       transition-all duration-300 text-sm underline"
-                style="font-family: var(--font-family-sans);"
-              >
-                {{ currentProvider.label }} API Key Instructions →
+          <!-- API Key Input -->
+          <div class="space-y-3">
+            <div class="flex justify-between">
+              <label class="text-[var(--color-text-secondary)] text-sm uppercase tracking-widest opacity-80">
+                API Key
+              </label>
+              <a :href="currentProvider.helpUrl" target="_blank" 
+                 class="text-xs text-[var(--color-secondary-champagne-gold)] hover:underline opacity-80 hover:opacity-100 flex items-center gap-1">
+                Get Key <span>&nearr;</span>
               </a>
             </div>
-          </Transition>
+            
+            <div class="relative group">
+              <input 
+                :type="showKey ? 'text' : 'password'"
+                v-model="enteredKey"
+                :placeholder="currentProvider.placeholder"
+                class="w-full bg-[rgba(0,0,0,0.3)] border border-[rgba(244,228,193,0.2)] rounded-xl px-4 py-3 pr-12
+                       text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)]/30
+                       focus:outline-none focus:border-[var(--color-secondary-champagne-gold)] focus:shadow-[0_0_15px_rgba(244,228,193,0.2)]
+                       transition-all duration-300 font-mono text-sm"
+              />
+              <button 
+                @click="showKey = !showKey"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
+              >
+                {{ showKey ? '🙈' : '👁️' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Model Selection -->
+          <div class="space-y-3">
+            <label class="text-[var(--color-text-secondary)] text-sm uppercase tracking-widest opacity-80">
+              Model
+            </label>
+            <div class="relative" ref="dropdownRef">
+              <!-- Dropdown Trigger -->
+              <button 
+                @click="toggleDropdown"
+                :disabled="isLoadingModels || !hasModels"
+                class="w-full bg-[rgba(0,0,0,0.3)] border border-[rgba(244,228,193,0.2)] rounded-xl px-4 py-3 pr-10
+                       text-[var(--color-text-primary)] text-left flex items-center justify-between
+                       focus:outline-none focus:border-[var(--color-secondary-champagne-gold)]
+                       disabled:opacity-50 disabled:cursor-not-allowed
+                       transition-all duration-300"
+              >
+                <span class="truncate">
+                  {{ selectedModelName || (isLoadingModels ? 'Fetching models...' : (hasModels ? 'Select a model' : 'Enter API key to fetch models')) }}
+                </span>
+                
+                <!-- Spinner or Arrow -->
+                <div class="pointer-events-none">
+                  <div v-if="isLoadingModels" class="animate-spin h-4 w-4 border-2 border-[var(--color-secondary-champagne-gold)] border-t-transparent rounded-full"></div>
+                  <span v-else class="text-[var(--color-text-tertiary)]">▼</span>
+                </div>
+              </button>
+
+              <!-- Dropdown Panel -->
+              <Transition name="dropdown-fade">
+                <div v-if="isDropdownOpen" 
+                     class="absolute z-50 w-full mt-2 bg-[rgba(20,10,30,0.95)] border border-[var(--color-secondary-champagne-gold)] 
+                            rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl overflow-hidden">
+                  
+                  <!-- Search Input -->
+                  <div class="p-2 border-b border-[rgba(244,228,193,0.1)]">
+                    <input 
+                      ref="searchInputRef"
+                      v-model="searchQuery"
+                      type="text"
+                      placeholder="Search models..."
+                      class="w-full bg-[rgba(255,255,255,0.05)] border border-transparent rounded-lg px-3 py-2
+                             text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)]/50 text-sm
+                             focus:outline-none focus:border-[rgba(244,228,193,0.3)]
+                             transition-all duration-200"
+                      @click.stop
+                    />
+                  </div>
+
+                  <!-- Options List -->
+                  <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                    <div v-if="filteredModels.length === 0" class="p-4 text-center text-[var(--color-text-tertiary)] text-sm">
+                      No models found
+                    </div>
+                    <button 
+                      v-for="model in filteredModels" 
+                      :key="model.id"
+                      @click="selectModel(model)"
+                      class="w-full text-left px-4 py-3 text-sm transition-colors duration-150
+                             hover:bg-[rgba(244,228,193,0.1)] flex items-center justify-between group"
+                      :class="selectedModel === model.id ? 'bg-[rgba(157,78,221,0.2)] text-[var(--color-secondary-champagne-gold)]' : 'text-[var(--color-text-secondary)]'"
+                    >
+                      <span>{{ model.name }}</span>
+                      <span v-if="selectedModel === model.id" class="text-[var(--color-secondary-champagne-gold)]">✓</span>
+                    </button>
+                  </div>
+                </div>
+              </Transition>
+            </div>
+            <p v-if="fetchError" class="text-red-400 text-xs mt-1">{{ fetchError }}</p>
+          </div>
+
+          <!-- Persistence Option -->
+          <div class="flex items-start gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.05)]">
+            <input 
+              type="checkbox" 
+              id="persist" 
+              v-model="persistKeys"
+              class="mt-1 accent-[var(--color-secondary-champagne-gold)] w-4 h-4 cursor-pointer" 
+            />
+            <label for="persist" class="cursor-pointer">
+              <span class="block text-[var(--color-text-primary)] text-sm font-medium">Trust this device</span>
+              <span class="block text-[var(--color-text-tertiary)] text-xs mt-0.5">
+                Save API key in browser storage. Only enable on personal, secure devices.
+              </span>
+            </label>
+          </div>
+
         </div>
 
-        <!-- Action Buttons -->
-        <div class="flex gap-4">
-          <!-- Save Button -->
-          <button
-            @click="saveConfig"
-            :disabled="!canSave"
-            style="font-family: var(--font-family-display);"
-            class="flex-1 rounded-2xl font-bold text-base py-4 px-8
-                   bg-gradient-to-r from-[var(--color-secondary-rose-gold)] 
-                   via-[var(--color-secondary-champagne-gold)] 
-                   to-[var(--color-secondary-burnished-bronze)]
-                   text-[var(--color-background-pure-black)] 
-                   uppercase tracking-[0.2em]
-                   shadow-[0_0_20px_rgba(244,228,193,0.5)]
-                   hover:shadow-[0_0_40px_rgba(244,228,193,0.7)]
-                   hover:scale-[1.02]
-                   disabled:opacity-40 disabled:cursor-not-allowed
-                   disabled:hover:scale-100 disabled:hover:shadow-none
-                   transition-all duration-500 ease-out"
-          >
-            ✨ Save & Close
-          </button>
-          
-          <!-- Cancel Button -->
-          <button
-            @click="cancel"
-            style="font-family: var(--font-family-display);"
-            class="rounded-2xl font-bold text-base py-4 px-8
-                   text-[var(--color-text-tertiary)]
-                   border-2 border-[rgba(244,228,193,0.25)]
-                   uppercase tracking-[0.2em]
-                   hover:border-[rgba(244,228,193,0.5)]
-                   hover:text-[var(--color-text-secondary)]
-                   hover:shadow-[0_0_20px_rgba(192,192,192,0.3)]
-                   transition-all duration-500 ease-out"
+        <!-- Footer -->
+        <div class="p-6 border-t border-[rgba(244,228,193,0.1)] flex gap-4">
+          <button 
+            @click="handleClose"
+            class="flex-1 py-3 rounded-xl border border-[rgba(244,228,193,0.2)] text-[var(--color-text-secondary)]
+                   hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--color-text-primary)] transition-all duration-300"
           >
             Cancel
           </button>
+          <button 
+            @click="handleSave"
+            :disabled="!enteredKey || !selectedModel"
+            class="flex-1 py-3 rounded-xl bg-gradient-to-r from-[var(--color-secondary-rose-gold)] to-[var(--color-secondary-burnished-bronze)]
+                   text-[var(--color-background-pure-black)] font-bold tracking-wide uppercase
+                   shadow-[0_0_20px_rgba(244,228,193,0.3)]
+                   hover:shadow-[0_0_30px_rgba(244,228,193,0.5)] hover:scale-[1.02]
+                   disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
+                   transition-all duration-300"
+          >
+            Save Configuration
+          </button>
         </div>
+
       </div>
     </div>
   </Transition>
 </template>
 
 <style scoped>
-/* Modal Transitions */
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.5s ease;
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.3s ease;
 }
 
-.modal-enter-active .glass-panel,
-.modal-leave-active .glass-panel {
-  transition: transform 0.5s ease, opacity 0.5s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
+.modal-fade-enter-from,
+.modal-fade-leave-to {
   opacity: 0;
 }
 
-.modal-enter-from .glass-panel,
-.modal-leave-to .glass-panel {
-  transform: scale(0.9);
-  opacity: 0;
+.modal-fade-enter-active .glass-panel,
+.modal-fade-leave-active .glass-panel {
+  transition: transform 0.3s ease-out;
 }
 
-/* Help Section Slide */
-.slide-enter-active,
-.slide-leave-active {
-  transition: all 0.3s ease;
+.modal-fade-enter-from .glass-panel,
+.modal-fade-leave-to .glass-panel {
+  transform: scale(0.95);
 }
 
-.slide-enter-from,
-.slide-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-/* Dropdown Transitions */
-.dropdown-enter-active,
-.dropdown-leave-active {
-  transition: all 0.3s ease;
-}
-
-.dropdown-enter-from,
-.dropdown-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-/* Custom Scrollbar */
+/* Custom Scrollbar for modal content */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
-
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.1);
 }
-
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(244, 228, 193, 0.3);
-  border-radius: 10px;
+  background: rgba(244, 228, 193, 0.2);
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(244, 228, 193, 0.4);
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(244, 228, 193, 0.5);
+.dropdown-fade-enter-active,
+.dropdown-fade-leave-active {
+  transition: all 0.2s ease-out;
+}
+
+.dropdown-fade-enter-from,
+.dropdown-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>

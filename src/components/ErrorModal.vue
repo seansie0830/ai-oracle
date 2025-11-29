@@ -274,7 +274,7 @@ function handleKeydown(event) {
             >
               <details class="cursor-pointer">
                 <summary class="text-[var(--color-text-tertiary)] text-sm uppercase tracking-wider mb-2 select-none hover:text-[var(--color-secondary-champagne-gold)] transition-colors">
-                  ▼ Technical Details
+                  Technical Details
                 </summary>
                 <div class="text-xs text-[var(--color-text-tertiary)] space-y-1 mt-2 font-mono bg-black/30 p-3 rounded-lg">
                   <div v-if="errorStore.currentError.type">

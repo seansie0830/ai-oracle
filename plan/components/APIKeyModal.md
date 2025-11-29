@@ -27,17 +27,24 @@ The modal overlays the entire screen with a semi-transparent backdrop and center
    - Secure password input field
    - Toggle visibility button (eye icon)
    - Placeholder text adapts to selected provider (e.g., "Enter your Gemini API key...")
+   - **Auto-fetch**: Validating the key automatically fetches available models
 
-4. **Security Option**:
+4. **Model Selection**:
+   - Dropdown menu populated dynamically based on the API key
+   - Shows model names (e.g., "Gemini 1.5 Pro", "Grok Beta")
+   - Default selection: First available or previously selected model
+   - Loading state: Spinner or "Fetching models..." indicator while loading
+
+5. **Security Option**:
    - **"Trust this device"** checkbox (disabled by default)
    - Warning text: "⚠️ Only enable on your personal, secure device"
    - Icon indicator showing current persistence state
 
-5. **Action Buttons**:
+6. **Action Buttons**:
    - **Save & Close**: Saves the configuration to Pinia store
    - **Cancel**: Closes modal without saving
 
-5. **Optional Help Section**:
+7. **Optional Help Section**:
    - Small collapsible "How to get your API key" section with provider-specific links
 
 ---
@@ -105,6 +112,7 @@ export const useLLMConfigStore = defineStore('llmConfig', {
     apiKey: '',
     isConfigured: false, // tracks if user has set up provider
     persistKeys: false, // NEW: controls whether to persist API keys
+    availableModels: [], // NEW: list of models fetched from provider
   }),
   
   getters: {
@@ -193,13 +201,36 @@ const llmService = new LLMService(llmConfig.provider, llmConfig.apiKey)
 **In APIKeyModal.vue**:
 ```javascript
 import { useLLMConfigStore } from '@/stores/llmConfig'
+import RealLLMService from '@/services/llm/RealLLMService'
 
 const llmConfig = useLLMConfigStore()
 const selectedProvider = ref(llmConfig.provider)
 const enteredKey = ref(llmConfig.apiKey)
+const availableModels = ref([])
+const selectedModel = ref(llmConfig.selectedModel)
+const isLoadingModels = ref(false)
+
+// Watch for key changes to fetch models
+watch(enteredKey, async (newKey) => {
+  if (newKey && newKey.length > 10) { // Basic length check
+    isLoadingModels.value = true
+    try {
+      availableModels.value = await RealLLMService.fetchAvailableModels(selectedProvider.value, newKey)
+      // Auto-select first if none selected
+      if (!selectedModel.value && availableModels.value.length > 0) {
+        selectedModel.value = availableModels.value[0].id
+      }
+    } catch (e) {
+      console.error("Failed to fetch models", e)
+      availableModels.value = [] // Reset or show error
+    } finally {
+      isLoadingModels.value = false
+    }
+  }
+})
 
 function saveConfig() {
-  llmConfig.updateConfig(selectedProvider.value, enteredKey.value)
+  llmConfig.updateConfig(selectedProvider.value, enteredKey.value, selectedModel.value)
   emit('close')
 }
 ```
@@ -355,6 +386,11 @@ const PROVIDERS = {
 │    │  │ ••••••••••••••••••••••••     │    │        │
 │    │  └──────────────────────────────┘    │        │
 │    │                                        │        │
+│    │  Model:                               │        │
+│    │  ┌──────────────────────────────┐     │        │
+│    │  │ Gemini 1.5 Pro           [▼] │     │        │
+│    │  └──────────────────────────────┘     │        │
+│    │                                        │        │
 │    │  ☐ Trust this device (persist key)   │        │
 │    │  ⚠️ Only enable on personal devices   │        │
 │    │                                        │        │
@@ -377,6 +413,8 @@ const PROVIDERS = {
 - [ ] Create `APIKeyModal.vue` component
 - [ ] Implement provider selection UI with theme-coherent styling
 - [ ] Implement secure API key input with visibility toggle
+- [ ] Implement dynamic model fetching using `RealLLMService.fetchAvailableModels`
+- [ ] Implement model selection dropdown
 - [ ] Connect component to Pinia store
 - [ ] Add opening/closing animations and transitions
 - [ ] Implement keyboard navigation and accessibility features
@@ -392,5 +430,5 @@ const PROVIDERS = {
 - **Provider Auto-Detection**: Automatically detect provider from API key format
 - **Rate Limit Display**: Show estimated usage or rate limits
 - **Test Connection**: Add a "Test API Key" button that makes a simple API call to validate
-- **Advanced Settings**: Model selection, temperature, max tokens, etc.
+- **Advanced Settings**: Temperature, max tokens, etc.
 - **Secure Storage**: Explore more secure storage options (though client-side has inherent limitations)
