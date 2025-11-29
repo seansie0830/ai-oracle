@@ -123,7 +123,7 @@ class RealLLMService {
                 tools: tools,
             });
 
-            const eventStream = agent.stream(
+            const eventStream = await agent.stream(
                 {
                     messages: [
                         new SystemMessage(this._getSystemPrompt()),
@@ -143,11 +143,23 @@ class RealLLMService {
 
                     // Check if it's an AI message with content
                     if (lastMessage._getType() === 'ai' && lastMessage.content) {
+                        let contentStr = "";
+                        if (typeof lastMessage.content === 'string') {
+                            contentStr = lastMessage.content;
+                        } else if (Array.isArray(lastMessage.content)) {
+                            // Handle array content (e.g. text blocks + tool use)
+                            // Extract text parts
+                            contentStr = lastMessage.content
+                                .filter(c => c.type === 'text')
+                                .map(c => c.text)
+                                .join('');
+                        }
+
                         // Only yield if this is new content we haven't seen
-                        if (lastMessage.content.length > finalResponseText.length) {
-                            const newContent = lastMessage.content.substring(finalResponseText.length);
-                            yield { type: 'text', chunk: newContent };
-                            finalResponseText = lastMessage.content;
+                        if (contentStr && contentStr.length > finalResponseText.length) {
+                            const newContent = contentStr.substring(finalResponseText.length);
+                            finalResponseText = contentStr;
+                            yield { type: 'text', chunk: newContent, fullText: finalResponseText };
                         }
                     }
 
@@ -216,14 +228,25 @@ class RealLLMService {
      * Factory method to create the Chat Model
      */
     _createModel() {
-        const { provider, apiKey, modelName } = this.config;
-        const commonConfig = { apiKey, streaming: true };
+        // Extract config values, handling both plain objects and Pinia stores
+        const provider = this.config.provider;
+        const apiKey = this.config.apiKey;
+        // Support both modelName (config) and selectedModel (store)
+        const modelName = this.config.modelName || this.config.selectedModel;
+
+        console.log(`[RealLLMService] Creating model: provider=${provider}, model=${modelName}, apiKey=${apiKey ? '***' : 'missing'}`);
+
+        const commonConfig = {
+            apiKey: String(apiKey), // Ensure it's a primitive string
+            streaming: true
+        };
 
         switch (provider) {
             case 'gemini':
                 return new ChatGoogleGenerativeAI({
                     ...commonConfig,
-                    modelName: modelName || "gemini-1.5-flash",
+                    model: modelName || "gemini-1.5-flash", // Use 'model' instead of 'modelName'
+                    googleApiKey: commonConfig.apiKey, // Explicitly map to googleApiKey
                 });
             case 'xai':
                 return new ChatOpenAI({
