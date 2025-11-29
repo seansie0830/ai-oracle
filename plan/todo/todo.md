@@ -1,0 +1,1 @@
+- add the some background to override the default selection color

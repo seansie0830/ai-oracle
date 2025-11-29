@@ -9,13 +9,24 @@
  * - Character-by-character streaming
  * - Special command triggers:
  *   - /draw -> Returns component trigger for TarotCard
- *   - /error -> Throws error for error handling testing
+ *   - /error or /error-mystical -> Throws mystical error
+ *   - /error-network -> Simulates network error
+ *   - /error-timeout -> Simulates timeout error
+ *   - /error-stream -> Simulates mid-stream error
+ *   - /error-rate -> Simulates rate limit error
  */
 
 class MockLLMService {
   constructor(options = {}) {
     this.thinkingDelay = options.thinkingDelay || 1000; // ms before streaming starts
     this.charDelay = options.charDelay || 30; // ms between characters
+  }
+
+  /**
+   * Clears the session history (no-op for mock but needed for interface consistency)
+   */
+  clearHistory() {
+    // No-op for mock service as it doesn't maintain history state
   }
 
   /**
@@ -27,8 +38,10 @@ class MockLLMService {
     // Simulate thinking/processing delay
     await this.delay(this.thinkingDelay);
 
+    const command = userMessage.trim().toLowerCase();
+
     // Check for special commands
-    if (userMessage.trim().toLowerCase() === '/draw') {
+    if (command === '/draw') {
       // Yield component trigger for TarotCard
       yield {
         type: 'component',
@@ -42,9 +55,52 @@ class MockLLMService {
       return;
     }
 
-    if (userMessage.trim().toLowerCase() === '/error') {
-      // Simulate an error
-      throw new Error('Mock LLM Error: Something went wrong with the mystical connection');
+    // Error simulation commands for testing
+    if (command === '/error' || command === '/error-mystical') {
+      const error = new Error('The cosmic energies are in flux. The oracle cannot divine at this moment.');
+      error.code = 'MYSTICAL_ERROR';
+      throw error;
+    }
+
+    if (command === '/error-network') {
+      const error = new Error('Network connection lost');
+      error.name = 'NetworkError';
+      error.code = 'NETWORK_ERROR';
+      throw error;
+    }
+
+    if (command === '/error-timeout') {
+      const error = new Error('Request timeout after 30 seconds');
+      error.code = 'TIMEOUT';
+      error.timeout = 30000;
+      throw error;
+    }
+
+    if (command === '/error-stream') {
+      // Simulate streaming then error mid-stream
+      const partialResponse = 'The cards reveal...';
+      let buffer = '';
+      for (const char of partialResponse) {
+        buffer += char;
+        yield {
+          type: 'text',
+          chunk: char,
+          fullText: buffer
+        };
+        await this.delay(this.charDelay);
+      }
+
+      // Then throw error
+      const error = new Error('Streaming connection interrupted');
+      error.code = 'STREAMING_ERROR';
+      throw error;
+    }
+
+    if (command === '/error-rate') {
+      const error = new Error('Rate limit exceeded. Please try again in 60 seconds.');
+      error.code = 'RATE_LIMIT';
+      error.retryAfter = 60;
+      throw error;
     }
 
     // Generate a mock response based on input

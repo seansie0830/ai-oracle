@@ -73,3 +73,10 @@ The component's color scheme strictly adheres to the definitions provided in the
 -   **Glass Panel Effect**: Utilizes a semi-transparent background, potentially based on a background color with reduced opacity.
 -   **System Messages/States**: Specific colors for success, error, or warning messages will be derived from the theme's semantic color palette if available, or defined locally to complement the overall aesthetic.
 -   **Accents/Highlights**: Used for subtle visual cues, cursors, or interactive glows, referencing `var(--c-acc-ec)` or similar accent colors.
+
+## 7. Service Integration Strategy
+- **Service Selection**:
+  - Check URL query parameters on initialization.
+  - If `?mock` is present (e.g., `http://localhost:5173/?mock`), initialize `MockLLMService`.
+  - Otherwise, default to `RealLLMService`.
+  - This allows for easy testing without spending API credits.

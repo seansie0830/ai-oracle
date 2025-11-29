@@ -18,9 +18,12 @@ const llmConfig = useLLMConfigStore()
 // Local state
 const selectedProvider = ref(llmConfig.provider)
 const enteredKey = ref(llmConfig.apiKey)
+const selectedModel = ref(llmConfig.selectedModel)
 const showKey = ref(false)
 const trustDevice = ref(llmConfig.persistKeys)
 const showHelp = ref(false)
+const modelSearchQuery = ref('')
+const isModelDropdownOpen = ref(false)
 
 // Provider metadata
 const PROVIDERS = {
@@ -52,11 +55,41 @@ const PROVIDERS = {
 
 // Computed
 const currentProvider = computed(() => PROVIDERS[selectedProvider.value])
-const canSave = computed(() => enteredKey.value.trim().length > 0)
+const availableModels = computed(() => llmConfig.availableModels)
+const filteredModels = computed(() => {
+  if (!modelSearchQuery.value) return availableModels.value
+  const query = modelSearchQuery.value.toLowerCase()
+  return availableModels.value.filter(model => 
+    model.name.toLowerCase().includes(query) || 
+    model.description.toLowerCase().includes(query) ||
+    model.id.toLowerCase().includes(query)
+  )
+})
+const selectedModelName = computed(() => {
+  const model = availableModels.value.find(m => m.id === selectedModel.value)
+  return model ? model.name : 'Select a model...'
+})
+const canSave = computed(() => enteredKey.value.trim().length > 0 && selectedModel.value.trim().length > 0)
 
 // Methods
 function selectProvider(provider) {
   selectedProvider.value = provider
+  // Reset model selection when provider changes
+  selectedModel.value = ''
+  modelSearchQuery.value = ''
+}
+
+function selectModel(modelId) {
+  selectedModel.value = modelId
+  isModelDropdownOpen.value = false
+  modelSearchQuery.value = ''
+}
+
+function toggleModelDropdown() {
+  isModelDropdownOpen.value = !isModelDropdownOpen.value
+  if (!isModelDropdownOpen.value) {
+    modelSearchQuery.value = ''
+  }
 }
 
 function toggleKeyVisibility() {
@@ -69,12 +102,14 @@ function saveConfig() {
   llmConfig.updateConfig(
     selectedProvider.value,
     enteredKey.value.trim(),
+    selectedModel.value,
     trustDevice.value
   )
   
   emit('save', {
     provider: selectedProvider.value,
     apiKey: enteredKey.value.trim(),
+    model: selectedModel.value,
     persist: trustDevice.value
   })
   emit('close')
@@ -84,7 +119,10 @@ function cancel() {
   // Reset to stored values
   selectedProvider.value = llmConfig.provider
   enteredKey.value = llmConfig.apiKey
+  selectedModel.value = llmConfig.selectedModel
   trustDevice.value = llmConfig.persistKeys
+  isModelDropdownOpen.value = false
+  modelSearchQuery.value = ''
   emit('close')
 }
 
@@ -107,7 +145,10 @@ watch(() => props.isOpen, (isOpen) => {
     // Load current values when opening
     selectedProvider.value = llmConfig.provider
     enteredKey.value = llmConfig.apiKey
+    selectedModel.value = llmConfig.selectedModel
     trustDevice.value = llmConfig.persistKeys
+    isModelDropdownOpen.value = false
+    modelSearchQuery.value = ''
   } else {
     document.removeEventListener('keydown', handleEscape)
   }
@@ -118,8 +159,8 @@ watch(() => props.isOpen, (isOpen) => {
   <Transition name="modal">
     <div
       v-if="isOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center 
-             bg-[rgba(0,0,0,0.85)] backdrop-blur-lg px-4"
+      class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto
+             bg-[rgba(0,0,0,0.85)] backdrop-blur-lg px-4 py-8"
       @click="handleBackdropClick"
     >
       <!-- Modal Panel -->
@@ -193,6 +234,116 @@ watch(() => props.isOpen, (isOpen) => {
                 {{ provider.label.split(' ')[0] }}
               </div>
             </button>
+          </div>
+        </div>
+
+        <!-- Model Selection -->
+        <div class="mb-6">
+          <label 
+            style="font-family: var(--font-family-serif);"
+            class="block text-[var(--color-text-secondary)] text-lg font-light mb-3"
+          >
+            Choose Model:
+          </label>
+          
+          <div class="relative">
+            <!-- Model Dropdown Button -->
+            <button
+              @click="toggleModelDropdown"
+              type="button"
+              class="w-full rounded-2xl glass-panel py-4 px-6 pr-12
+                     border-2 border-[rgba(244,228,193,0.25)]
+                     text-[var(--color-text-secondary)] text-base text-left
+                     hover:border-[rgba(244,228,193,0.5)]
+                     focus:outline-none focus:border-[rgba(244,228,193,0.5)]
+                     focus:shadow-[0_0_30px_rgba(157,78,221,0.4)]
+                     transition-all duration-500 ease-out"
+              style="font-family: var(--font-family-sans);"
+            >
+              <span :class="selectedModel ? '' : 'text-[var(--color-text-tertiary)]/40'">
+                {{ selectedModelName }}
+              </span>
+              <span class="absolute right-4 top-1/2 transform -translate-y-1/2 text-[var(--color-text-tertiary)] transition-transform duration-300"
+                    :class="isModelDropdownOpen ? 'rotate-180' : ''">
+                ▼
+              </span>
+            </button>
+
+            <!-- Dropdown Menu -->
+            <Transition name="dropdown">
+              <div
+                v-if="isModelDropdownOpen"
+                class="absolute z-10 w-full mt-2 rounded-2xl glass-panel 
+                       border-2 border-[rgba(244,228,193,0.25)]
+                       shadow-[0_0_50px_rgba(157,78,221,0.3)]
+                       overflow-hidden"
+              >
+                <!-- Search Input -->
+                <div class="p-3 border-b border-[rgba(244,228,193,0.15)]">
+                  <input
+                    v-model="modelSearchQuery"
+                    type="text"
+                    placeholder="Search models..."
+                    class="w-full rounded-xl glass-panel py-2 px-4
+                           border border-[rgba(244,228,193,0.15)]
+                           text-[var(--color-text-secondary)] text-sm
+                           placeholder-[var(--color-text-tertiary)]/40
+                           focus:outline-none focus:border-[rgba(244,228,193,0.35)]
+                           transition-all duration-300"
+                    style="font-family: var(--font-family-sans);"
+                    @click.stop
+                  />
+                </div>
+
+                <!-- Model List -->
+                <div class="max-h-64 overflow-y-auto custom-scrollbar">
+                  <button
+                    v-for="model in filteredModels"
+                    :key="model.id"
+                    @click="selectModel(model.id)"
+                    class="w-full text-left px-4 py-3 transition-all duration-300
+                           hover:bg-[rgba(244,228,193,0.1)]
+                           border-b border-[rgba(244,228,193,0.05)] last:border-b-0"
+                    :class="selectedModel === model.id ? 'bg-[rgba(244,228,193,0.15)]' : ''"
+                  >
+                    <div class="flex items-start gap-2">
+                      <span v-if="selectedModel === model.id" 
+                            class="text-[var(--color-secondary-champagne-gold)] text-lg mt-0.5">
+                        ✓
+                      </span>
+                      <div class="flex-1">
+                        <div 
+                          style="font-family: var(--font-family-sans);"
+                          class="text-[var(--color-text-secondary)] text-base font-medium"
+                          :class="selectedModel === model.id ? 'text-[var(--color-secondary-champagne-gold)]' : ''"
+                        >
+                          {{ model.name }}
+                        </div>
+                        <div 
+                          style="font-family: var(--font-family-sans);"
+                          class="text-[var(--color-text-tertiary)] text-xs mt-0.5"
+                        >
+                          {{ model.description }}
+                        </div>
+                        <div 
+                          style="font-family: var(--font-family-sans);"
+                          class="text-[var(--color-text-tertiary)]/50 text-xs mt-0.5 font-mono"
+                        >
+                          {{ model.id }}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                  
+                  <!-- No Results Message -->
+                  <div v-if="filteredModels.length === 0" 
+                       class="px-4 py-6 text-center text-[var(--color-text-tertiary)] text-sm"
+                       style="font-family: var(--font-family-sans);">
+                    No models found matching "{{ modelSearchQuery }}"
+                  </div>
+                </div>
+              </div>
+            </Transition>
           </div>
         </div>
 
@@ -370,5 +521,36 @@ watch(() => props.isOpen, (isOpen) => {
 .slide-leave-to {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+/* Dropdown Transitions */
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: all 0.3s ease;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(244, 228, 193, 0.3);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(244, 228, 193, 0.5);
 }
 </style>

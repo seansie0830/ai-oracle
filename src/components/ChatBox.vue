@@ -1,19 +1,36 @@
 <script setup>
 import { ref, nextTick, onMounted } from 'vue'
 import MockLLMService from '@/services/llm/MockLLMService'
+import RealLLMService from '@/services/llm/RealLLMService'
+import APIKeyModal from './APIKeyModal.vue'
+import ErrorModal from './ErrorModal.vue'
+import { useLLMConfigStore } from '@/stores/llmConfig'
+import { useChatStore } from '@/stores/chat'
+import { useErrorHandler } from '@/composables/useErrorHandler'
+import { storeToRefs } from 'pinia'
+
+// Store
+const llmConfig = useLLMConfigStore()
+const chatStore = useChatStore()
+
+// Error Handler
+const { handleLLMError } = useErrorHandler()
 
 // State
-const messages = ref([])
+const { messages } = storeToRefs(chatStore)
 const input = ref('')
 const isThinking = ref(false)
 const chatContainer = ref(null)
 const shouldAutoScroll = ref(true)
+const showApiKeyModal = ref(false)
 
-// Initialize mock LLM service
-const llmService = new MockLLMService({
-  thinkingDelay: 1200,
-  charDelay: 25
-})
+// Initialize LLM service based on URL query param
+const urlParams = new URLSearchParams(window.location.search)
+const useMock = urlParams.has('mock')
+
+const llmService = useMock 
+  ? new MockLLMService({ thinkingDelay: 1200, charDelay: 25 })
+  : new RealLLMService(llmConfig) // Pass store as config source
 
 // Message ID counter
 let messageIdCounter = 0
@@ -30,7 +47,8 @@ async function sendMessage() {
     sender: 'user',
     type: 'text'
   }
-  messages.value.push(userMessage)
+
+  chatStore.addMessage(userMessage)
   input.value = ''
   
   await scrollToBottom()
@@ -47,7 +65,8 @@ async function sendMessage() {
     type: 'text',
     isStreaming: true
   }
-  messages.value.push(oracleMessage)
+
+  chatStore.addMessage(oracleMessage)
 
   try {
     // Stream response from mock LLM
@@ -65,37 +84,22 @@ async function sendMessage() {
           isStreaming: false
         }
         // Replace the placeholder message
-        const index = messages.value.findIndex(m => m.id === oracleMessageId)
-        if (index !== -1) {
-          messages.value[index] = componentMessage
-        }
+        chatStore.replaceMessage(oracleMessageId, componentMessage)
       } else if (chunk.type === 'text') {
         // Update streaming text
-        const index = messages.value.findIndex(m => m.id === oracleMessageId)
-        if (index !== -1) {
-          messages.value[index].text = chunk.fullText
-        }
+        chatStore.updateMessage(oracleMessageId, { text: chunk.fullText })
         if (shouldAutoScroll.value) {
           await scrollToBottom()
         }
       } else if (chunk.type === 'done') {
         // Mark streaming complete
-        const index = messages.value.findIndex(m => m.id === oracleMessageId)
-        if (index !== -1) {
-          messages.value[index].isStreaming = false
-        }
+        chatStore.updateMessage(oracleMessageId, { isStreaming: false })
       }
     }
   } catch (error) {
-    // Handle errors
+    // Handle errors with error modal
     isThinking.value = false
-    const errorMessage = {
-      id: `msg-${messageIdCounter++}`,
-      text: `⚠️ ${error.message}`,
-      sender: 'system',
-      type: 'error'
-    }
-    messages.value.push(errorMessage)
+    handleLLMError(error)
   }
 
   await scrollToBottom()
@@ -125,14 +129,52 @@ function handleScroll() {
   shouldAutoScroll.value = scrollHeight - scrollTop - clientHeight < 100
 }
 
+// Handle retry action from error modal
+function handleRetry() {
+  // Retry the last user message
+  const lastUserMessage = messages.value
+    .slice()
+    .reverse()
+    .find(m => m.sender === 'user')
+  
+  if (lastUserMessage) {
+    input.value = lastUserMessage.text
+    nextTick(() => {
+      sendMessage()
+    })
+  }
+}
+
+// Handle configure action from error modal
+function handleConfigure() {
+  showApiKeyModal.value = true
+}
+
+// Handle clear chat
+function handleClearChat() {
+  chatStore.clearMessages()
+  llmService.clearHistory()
+}
+
 // Welcome message on mount
 onMounted(() => {
-  messages.value.push({
+  // Load persisted config if available
+  llmConfig.loadFromStorage()
+  
+  // Show welcome message
+  chatStore.addMessage({
     id: `msg-${messageIdCounter++}`,
     text: 'Welcome, seeker. I am the Mystic Oracle. Ask me anything, or try /draw to reveal a tarot card.',
     sender: 'oracle',
     type: 'text'
   })
+  
+  // Auto-show modal if not configured
+  if (!llmConfig.hasValidConfig) {
+    setTimeout(() => {
+      showApiKeyModal.value = true
+    }, 2000) // 2 second delay for better UX
+  }
 })
 </script>
 
@@ -140,18 +182,52 @@ onMounted(() => {
   <!-- Outer centered wrapper for wide screens -->
   <div class="flex justify-center min-h-screen w-full bg-transparent">
     <div class="flex flex-col h-screen w-full max-w-5xl">
-      <!-- Premium Header with Gilded Border -->
+    <!-- Premium Header with Gilded Border -->
     <header class="glass-panel border-b border-[rgba(244,228,193,0.3)] shimmer py-2 px-6">
-      <div class="max-w-4xl mx-auto ">
-        <h1 style="font-family: var(--font-family-display);" 
-            class="text-4xl  font-black text-[var(--color-secondary-champagne-gold)] 
-                   tracking-[0.3em] text-center uppercase drop-shadow-[0_2px_10px_rgba(244,228,193,0.3)]">
-          ✦ Mystic Oracle ✦
-        </h1>
-        <p style="font-family: var(--font-family-serif);" 
-           class="text-center text-[var(--color-text-tertiary)] text-sm mt-3 italic tracking-widest">
-          The Divine Divination Experience
-        </p>
+      <div class="max-w-4xl mx-auto flex items-center justify-between">
+        <!-- Clear Button -->
+        <button
+          @click="handleClearChat"
+          class="mr-4 text-2xl text-[var(--color-text-tertiary)] 
+                 hover:text-[var(--color-secondary-rose-gold)]
+                 hover:scale-110 transition-all duration-300"
+          aria-label="Clear Chat"
+          title="Clear Chat History"
+        >
+          🧹
+        </button>
+
+        <div class="flex-1">
+          <h1 style="font-family: var(--font-family-display);" 
+              class="text-4xl  font-black text-[var(--color-secondary-champagne-gold)] 
+                     tracking-[0.3em] text-center uppercase drop-shadow-[0_2px_10px_rgba(244,228,193,0.3)]">
+            ✦ Mystic Oracle ✦
+          </h1>
+          <p style="font-family: var(--font-family-serif);" 
+             class="text-center text-[var(--color-text-tertiary)] text-sm mt-3 italic tracking-widest">
+            The Divine Divination Experience
+          </p>
+        </div>
+        
+        <!-- Settings Button -->
+        <button
+          @click="showApiKeyModal = true"
+          class="ml-4 text-2xl text-[var(--color-text-tertiary)] 
+                 hover:text-[var(--color-secondary-champagne-gold)]
+                 hover:rotate-45 transition-all duration-300
+                 relative"
+          :class="{ 'text-[var(--color-tertiary-emerald)]': llmConfig.hasValidConfig }"
+          aria-label="Settings"
+          title="Configure API Key"
+        >
+          ⚙️
+          <span 
+            v-if="llmConfig.hasValidConfig && llmConfig.isPersistent"
+            class="absolute -top-1 -right-1 w-3 h-3 bg-[var(--color-tertiary-emerald)] 
+                   rounded-full border border-[var(--color-background-pure-black)]"
+            title="API key persisted"
+          ></span>
+        </button>
       </div>
     </header>
 
@@ -246,6 +322,10 @@ onMounted(() => {
           @keypress="handleKeyPress"
           type="text"
           placeholder="Seek the wisdom of the oracle..."
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
           class="flex-1 rounded-2xl glass-panel py-5 px-7
                  border-2 border-[rgba(244,228,193,0.25)]
                  text-[var(--color-text-secondary)] text-lg
@@ -280,6 +360,19 @@ onMounted(() => {
     </div>
   </div>
 </div>
+
+  <!-- API Key Modal -->
+  <APIKeyModal 
+    :isOpen="showApiKeyModal" 
+    @close="showApiKeyModal = false"
+    @save="showApiKeyModal = false"
+  />
+  
+  <!-- Error Modal -->
+  <ErrorModal 
+    @retry="handleRetry"
+    @configure="handleConfigure"
+  />
 </template>
 
 
