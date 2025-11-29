@@ -285,9 +285,6 @@ onMounted(() => {
               :is="tarotComponentRegistry[message.componentName]"
               v-bind="message.data"
             />
-            <p class="text-[var(--color-tertiary-celestial)] text-xs mt-5 opacity-70 tracking-wider text-center">
-              ✨ {{ message.componentName }} Component
-            </p>
           </div>
           
           <!-- Fallback for component messages when deck mode is disabled -->
@@ -308,7 +305,7 @@ onMounted(() => {
                 {{ message.data.description || 'Enable deck mode by adding ?deck to URL' }}
               </p>
               <p class="text-[var(--color-tertiary-celestial)] text-xs mt-5 opacity-70 tracking-wider">
-                ✨ {{ message.componentName }} Component
+
               </p>
             </div>
           </div>
