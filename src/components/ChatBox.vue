@@ -141,7 +141,7 @@ onMounted(() => {
   <div class="flex justify-center min-h-screen w-full bg-transparent">
     <div class="flex flex-col h-screen w-full max-w-5xl">
       <!-- Premium Header with Gilded Border -->
-    <header class="glass-panel border-b border-[rgba(244,228,193,0.3)] shimmer py-6 px-6">
+    <header class="glass-panel border-b border-[rgba(244,228,193,0.3)] shimmer py-2 px-6">
       <div class="max-w-4xl mx-auto ">
         <h1 style="font-family: var(--font-family-display);" 
             class="text-4xl  font-black text-[var(--color-secondary-champagne-gold)] 
