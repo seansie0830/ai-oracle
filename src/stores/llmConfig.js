@@ -14,7 +14,7 @@ export const useLLMConfigStore = defineStore('llmConfig', {
     providerName: (state) => {
       const names = {
         gemini: 'Google Gemini',
-        xai: 'xAI (Grok)',
+        huggingface: 'HuggingFace',
         groq: 'Groq',
         openrouter: 'OpenRouter'
       }

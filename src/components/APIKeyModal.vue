@@ -35,12 +35,12 @@ const PROVIDERS = {
     helpUrl: 'https://aistudio.google.com/app/apikey'
   }
   ,
-  xai: {
-    id: 'xai',
-    label: 'xAI (Grok)',
-    icon: '🚀',
-    placeholder: 'Enter your xAI API key',
-    helpUrl: 'https://x.ai/api'
+  huggingface: {
+    id: 'huggingface',
+    label: 'HuggingFace',
+    icon: '🤗',
+    placeholder: 'Enter your HuggingFace token (hf_...)',
+    helpUrl: 'https://huggingface.co/settings/tokens'
   },
   groq: {
     id: 'groq',

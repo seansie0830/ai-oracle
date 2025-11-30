@@ -1,7 +1,7 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatGroq } from "@langchain/groq";
-import { ChatXAI } from "@langchain/xai";
+
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
@@ -13,7 +13,7 @@ import { useI18nStore } from '@/stores/i18n';
 /**
  * Real LLM Service Implementation
  * 
- * Connects to actual LLM providers (Gemini, xAI, Groq, OpenRouter) using LangChain.js.
+ * Connects to actual LLM providers (Gemini, HuggingFace, Groq, OpenRouter) using LangChain.js.
  * Implements the same interface as MockLLMService for seamless swapping.
  */
 class RealLLMService {
@@ -39,7 +39,7 @@ class RealLLMService {
 
     /**
      * Fetches the list of available models from the specified provider
-     * @param {string} provider - The LLM provider (gemini, xai, groq, openrouter)
+     * @param {string} provider - The LLM provider (gemini, huggingface, groq, openrouter)
      * @param {string} apiKey - The API key for the provider
      * @returns {Promise<Array<{id: string, name: string}>>} List of models
      */
@@ -65,11 +65,11 @@ class RealLLMService {
                         }));
                     break;
 
-                case 'xai':
+                case 'huggingface':
                 case 'groq':
                 case 'openrouter':
                     let baseUrl = "";
-                    if (provider === 'xai') baseUrl = "https://api.x.ai/v1/models";
+                    if (provider === 'huggingface') baseUrl = "https://router.huggingface.co/v1/models";
                     if (provider === 'groq') baseUrl = "https://api.groq.com/openai/v1/models";
                     if (provider === 'openrouter') baseUrl = "https://openrouter.ai/api/v1/models";
 
@@ -282,11 +282,14 @@ class RealLLMService {
                     model: modelName || "gemini-1.5-flash",
                     googleApiKey: String(apiKey), // Explicitly map to googleApiKey
                 });
-            case 'xai':
-                return new ChatXAI({
+            case 'huggingface':
+                return new ChatOpenAI({
                     apiKey: String(apiKey),
                     streaming: true,
-                    model: modelName || "grok-beta",
+                    model: modelName || "meta-llama/Meta-Llama-3-8B-Instruct",
+                    configuration: {
+                        baseURL: "https://router.huggingface.co/v1",
+                    }
                 });
             case 'groq':
                 return new ChatGroq({
