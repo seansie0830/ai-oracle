@@ -169,6 +169,21 @@ function handleClearChat() {
   llmService.clearHistory()
 }
 
+// Copy to clipboard
+const copiedMessageId = ref(null)
+
+async function copyToClipboard(text, messageId) {
+  try {
+    await navigator.clipboard.writeText(text)
+    copiedMessageId.value = messageId
+    setTimeout(() => {
+      copiedMessageId.value = null
+    }, 2000)
+  } catch (err) {
+    console.error('Failed to copy text: ', err)
+  }
+}
+
 // Welcome message ID tracking
 const welcomeMessageId = ref(null)
 
@@ -237,10 +252,6 @@ onMounted(() => {
                      tracking-[0.3em] text-center uppercase drop-shadow-[0_2px_10px_rgba(244,228,193,0.3)]">
             ✦ Mystic Oracle ✦
           </h1>
-          <p style="font-family: var(--font-family-serif);" 
-             class="text-center text-[var(--color-text-tertiary)] text-sm mt-3 italic tracking-widest">
-            The Divine Divination Experience
-          </p>
         </div>
         
         <!-- Settings Button -->
@@ -277,9 +288,20 @@ onMounted(() => {
           v-for="message in messages"
           :key="message.id"
           class="fade-in"
-          :class="message.sender === 'user' ? 'flex justify-end' : 'flex justify-start'"
+          :class="message.sender === 'user' ? 'flex justify-end items-center gap-3 group' : 'flex justify-start items-center gap-3 group'"
         >
-          <!-- User Message with Elegant Style -->
+          <!-- Copy Button for User (Left side) -->
+          <button 
+            v-if="message.sender === 'user'"
+            @click="copyToClipboard(message.text, message.id)"
+            class="opacity-0 group-hover:opacity-100 transition-all duration-300
+                   bg-[var(--color-background-pure-black)] border border-[var(--color-secondary-champagne-gold)]
+                   rounded-full p-2 shadow-lg hover:scale-110 text-sm
+                   text-[var(--color-secondary-champagne-gold)]"
+            title="Copy"
+          >
+            {{ copiedMessageId === message.id ? '✅' : '📋' }}
+          </button>
           <div
             v-if="message.sender === 'user'"
             class="glass-panel border border-[rgba(244,228,193,0.2)] hover-lift
@@ -300,6 +322,19 @@ onMounted(() => {
             ></div>
             <span v-if="message.isStreaming" class="typing-cursor"></span>
           </div>
+
+          <!-- Copy Button for Oracle (Right side) -->
+          <button 
+            v-if="message.sender === 'oracle' && message.type === 'text'"
+            @click="copyToClipboard(message.text, message.id)"
+            class="opacity-0 group-hover:opacity-100 transition-all duration-300
+                   bg-[var(--color-background-pure-black)] border border-[var(--color-secondary-champagne-gold)]
+                   rounded-full p-2 shadow-lg hover:scale-110 text-sm
+                   text-[var(--color-secondary-champagne-gold)]"
+            title="Copy"
+          >
+            {{ copiedMessageId === message.id ? '✅' : '📋' }}
+          </button>
 
           <!-- Component Message with Divine Glow -->
           <div

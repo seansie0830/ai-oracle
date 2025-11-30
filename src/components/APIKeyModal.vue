@@ -33,7 +33,8 @@ const PROVIDERS = {
     icon: '✨',
     placeholder: 'Enter your Gemini API key (AIza...)',
     helpUrl: 'https://aistudio.google.com/app/apikey'
-  },
+  }
+  ,
   xai: {
     id: 'xai',
     label: 'xAI (Grok)',
@@ -53,8 +54,9 @@ const PROVIDERS = {
     label: 'OpenRouter',
     icon: '🔀',
     placeholder: 'Enter your OpenRouter API key',
-    helpUrl: 'https://openrouter.ai/keys'
-  }
+    helpUrl: 'https://openrouter.ai/keys'}
+    
+  
 }
 
 // Computed

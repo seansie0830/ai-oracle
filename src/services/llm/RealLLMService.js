@@ -1,5 +1,7 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatOpenAI } from "@langchain/openai";
+import { ChatGroq } from "@langchain/groq";
+import { ChatXAI } from "@langchain/xai";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
@@ -272,36 +274,33 @@ class RealLLMService {
 
         console.log(`[RealLLMService] Creating model: provider=${provider}, model=${modelName}, apiKey=${apiKey ? '***' : 'missing'}`);
 
-        const commonConfig = {
-            apiKey: String(apiKey), // Ensure it's a primitive string
-            streaming: true
-        };
-
         switch (provider) {
             case 'gemini':
                 return new ChatGoogleGenerativeAI({
-                    ...commonConfig,
-                    model: modelName || "gemini-1.5-flash", // Use 'model' instead of 'modelName'
-                    googleApiKey: commonConfig.apiKey, // Explicitly map to googleApiKey
+                    apiKey: String(apiKey), // Ensure it's a primitive string
+                    streaming: true,
+                    model: modelName || "gemini-1.5-flash",
+                    googleApiKey: String(apiKey), // Explicitly map to googleApiKey
                 });
             case 'xai':
-                return new ChatOpenAI({
-                    ...commonConfig,
-                    baseURL: "https://api.x.ai/v1",
-                    modelName: modelName || "grok-beta",
+                return new ChatXAI({
+                    apiKey: String(apiKey),
+                    streaming: true,
+                    model: modelName || "grok-beta",
                 });
             case 'groq':
-                return new ChatOpenAI({
-                    ...commonConfig,
-                    baseURL: "https://api.groq.com/openai/v1",
-                    modelName: modelName || "llama3-70b-8192",
+                return new ChatGroq({
+                    apiKey: String(apiKey),
+                    streaming: true,
+                    model: modelName || "llama3-groq-70b-8192-tool-use-preview",
                 });
             case 'openrouter':
                 return new ChatOpenAI({
-                    ...commonConfig,
-                    baseURL: "https://openrouter.ai/api/v1",
-                    modelName: modelName || "anthropic/claude-3-opus",
+                    apiKey: String(apiKey),
+                    streaming: true,
+                    model: modelName || "anthropic/claude-3-opus",
                     configuration: {
+                        baseURL: "https://openrouter.ai/api/v1",
                         defaultHeaders: {
                             "HTTP-Referer": "https://tarot-app.com",
                             "X-Title": "Tarot Reader",
