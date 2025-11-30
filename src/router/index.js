@@ -8,6 +8,11 @@ const router = createRouter({
       name: 'chat',
       // Lazy load the main component
       component: () => import('@/components/ChatBox.vue')
+    },
+    {
+      path: '/gallery',
+      name: 'gallery',
+      component: () => import('@/views/CardGallery.vue')
     }
   ],
 })

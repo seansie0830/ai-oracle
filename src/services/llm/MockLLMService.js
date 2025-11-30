@@ -4,7 +4,7 @@
  * This service simulates LLM streaming behavior without making actual API calls.
  */
 
-import { drawRandomCard, drawMultipleCards } from '../../utils/tarotUtils'
+import { drawRandomCard, drawMultipleCards, drawRandomCardFromFullDeck, drawMultipleCardsFromFullDeck } from '../../utils/tarotUtils'
 import i18n from '../../i18n'
 
 class MockLLMService {
@@ -33,8 +33,8 @@ class MockLLMService {
 
     // Check for special commands
     if (command === '/draw' || command === '/card') {
-      // Yield component trigger for single TarotCard with random card
-      const randomCard = drawRandomCard()
+      // Yield component trigger for single TarotCard with random card from full deck
+      const randomCard = drawRandomCardFromFullDeck()
       yield {
         type: 'component',
         componentName: 'TarotCard',
@@ -48,8 +48,8 @@ class MockLLMService {
     }
 
     if (command === '/draw-reversed' || command === '/card-reversed') {
-      // Yield reversed tarot card (force reversed orientation)
-      const randomCard = drawRandomCard()
+      // Yield reversed tarot card from full deck (force reversed orientation)
+      const randomCard = drawRandomCardFromFullDeck()
       yield {
         type: 'component',
         componentName: 'TarotCard',
@@ -63,8 +63,8 @@ class MockLLMService {
     }
 
     if (command === '/spread' || command === '/spread-three') {
-      // Yield three-card spread with random cards
-      const randomCards = drawMultipleCards(3)
+      // Yield three-card spread with random cards from full deck
+      const randomCards = drawMultipleCardsFromFullDeck(3)
       yield {
         type: 'component',
         componentName: 'TarotSpread',
@@ -79,8 +79,8 @@ class MockLLMService {
     }
 
     if (command === '/spread-celtic' || command === '/celtic-cross') {
-      // Yield Celtic Cross spread with random cards
-      const randomCards = drawMultipleCards(10)
+      // Yield Celtic Cross spread with random cards from full deck
+      const randomCards = drawMultipleCardsFromFullDeck(10)
       yield {
         type: 'component',
         componentName: 'TarotSpread',
@@ -116,6 +116,77 @@ class MockLLMService {
           mode: 'multiple',
           count: 3
         }
+      };
+      return;
+    }
+
+    // Major Arcana Only Commands
+    if (command === '/draw-major' || command === '/card-major') {
+      // Yield single card from MAJOR ARCANA ONLY
+      const randomCard = drawRandomCard()
+      yield {
+        type: 'component',
+        componentName: 'TarotCard',
+        data: {
+          cardName: randomCard.cardName,
+          orientation: randomCard.orientation,
+          isRevealed: true
+        }
+      };
+      return;
+    }
+
+    if (command === '/spread-major' || command === '/spread-three-major') {
+      // Yield three-card spread from MAJOR ARCANA ONLY
+      const randomCards = drawMultipleCards(3)
+      yield {
+        type: 'component',
+        componentName: 'TarotSpread',
+        data: {
+          spreadType: 'three-card',
+          cards: randomCards,
+          autoReveal: true,
+          revealDelay: 500
+        }
+      };
+      return;
+    }
+
+    if (command === '/celtic-major') {
+      // Yield Celtic Cross spread from MAJOR ARCANA ONLY
+      const randomCards = drawMultipleCards(10)
+      yield {
+        type: 'component',
+        componentName: 'TarotSpread',
+        data: {
+          spreadType: 'celtic-cross',
+          cards: randomCards,
+          autoReveal: true,
+          revealDelay: 400
+        }
+      };
+      return;
+    }
+
+    if (command === '/help') {
+      // Show help text with all available commands
+      const helpText = i18n.global.t('mock.helpText');
+
+      // Stream the help response
+      let buffer = '';
+      for (const char of helpText) {
+        buffer += char;
+        yield {
+          type: 'text',
+          chunk: char,
+          fullText: buffer
+        };
+        await this.delay(this.charDelay);
+      }
+
+      yield {
+        type: 'done',
+        fullText: buffer
       };
       return;
     }

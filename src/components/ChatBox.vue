@@ -254,6 +254,18 @@ onMounted(() => {
           </h1>
         </div>
         
+        <!-- Gallery Link -->
+        <router-link
+          to="/gallery"
+          class="ml-4 text-2xl text-[var(--color-text-tertiary)] 
+                 hover:text-[var(--color-secondary-champagne-gold)]
+                 hover:scale-110 transition-all duration-300"
+          aria-label="Card Gallery"
+          title="View Card Gallery"
+        >
+          🎴
+        </router-link>
+
         <!-- Settings Button -->
         <button
           @click="showApiKeyModal = true"

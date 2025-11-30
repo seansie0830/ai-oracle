@@ -16,6 +16,26 @@ const cardImages = import.meta.glob('../assets/tarot-deck/major-arcana/*.{png,jp
     import: 'default'
 })
 
+// Use Vite's glob import to eagerly load minor arcana card images
+const minorArcanaImages = {
+    pentacles: import.meta.glob('../assets/tarot-deck/minor-arcna/pentacles/*.{png,jpg,webp}', {
+        eager: true,
+        import: 'default'
+    }),
+    cups: import.meta.glob('../assets/tarot-deck/minor-arcna/cup/*.{png,jpg,webp}', {
+        eager: true,
+        import: 'default'
+    }),
+    wands: import.meta.glob('../assets/tarot-deck/minor-arcna/wand/*.{png,jpg,webp}', {
+        eager: true,
+        import: 'default'
+    }),
+    swords: import.meta.glob('../assets/tarot-deck/minor-arcna/sword/*.{png,jpg,webp}', {
+        eager: true,
+        import: 'default'
+    })
+}
+
 // Use Vite's glob import to eagerly load card back images (supports multiple formats)
 const cardBackImages = import.meta.glob('../assets/tarot-deck/card-back.{png,jpg,webp}', {
     eager: true,
@@ -34,7 +54,7 @@ const CARD_INDEX_MAP = {
     'The Chariot': 7,
     'Strength': 8,
     'The Hermit': 9,
-    'Wheel of Fortune': 10,
+    'Wheel of Fortune': 'major_10',
     'Justice': 11,
     'The Hanged Man': 12,
     'Death': 13,
@@ -49,12 +69,61 @@ const CARD_INDEX_MAP = {
 }
 
 /**
- * Get the image path for a tarot card
+ * Get the image path for a minor arcana card
  * Tries to load real image first, falls back to procedural generation
- * @param {string} cardName - The name of the card (e.g., "The Fool")
+ * @param {string} suit - The suit (pentacles, cups, wands, swords)
+ * @param {string|number} rank - The rank (1-10, 'page', 'knight', 'queen', 'king')
+ * @returns {string} - Image URL or data URI
+ */
+export function getMinorArcanaImage(suit, rank) {
+    const normalizedSuit = suit.toLowerCase()
+    const normalizedRank = String(rank).toLowerCase()
+
+    // Map 'cups' to 'cup' directory, keep others as-is
+    const suitKey = normalizedSuit === 'cups' ? 'cups' : normalizedSuit
+    const dirName = normalizedSuit === 'cups' ? 'cup' : normalizedSuit === 'wands' ? 'wand' : normalizedSuit === 'swords' ? 'sword' : normalizedSuit
+
+    if (minorArcanaImages[suitKey]) {
+        const extensions = ['png', 'jpg', 'webp']
+
+        for (const ext of extensions) {
+            const imagePath = `../assets/tarot-deck/minor-arcna/${dirName}/${normalizedRank}.${ext}`
+            if (minorArcanaImages[suitKey][imagePath]) {
+                return minorArcanaImages[suitKey][imagePath]
+            }
+        }
+    }
+
+    // Fallback to procedural generation if image not found
+    const cardName = `${rank} of ${suit}`
+    console.warn(`Minor arcana image not found for: ${cardName}, using procedural fallback`)
+    return generatePlaceholderCard(cardName)
+}
+
+/**
+ * Get the image path for a tarot card (works with both major and minor arcana)
+ * Tries to load real image first, falls back to procedural generation
+ * @param {string} cardName - The name of the card (e.g., "The Fool" or "Ace of Cups")
  * @returns {string} - Image URL or data URI
  */
 export function getCardImage(cardName) {
+    // Check if this is a minor arcana card (format: "Rank of Suit")
+    const minorArcanaPattern = /^(.+?)\s+of\s+(.+)$/i
+    const match = cardName.match(minorArcanaPattern)
+
+    if (match) {
+        // This is a minor arcana card
+        const rank = match[1].trim()
+        const suit = match[2].trim()
+
+        // Convert rank name to filename format
+        let rankFile = rank.toLowerCase()
+        if (rankFile === 'ace') rankFile = '1'
+
+        return getMinorArcanaImage(suit, rankFile)
+    }
+
+    // This is a major arcana card - use existing logic
     const index = CARD_INDEX_MAP[cardName]
 
     if (index !== undefined) {
@@ -63,6 +132,16 @@ export function getCardImage(cardName) {
 
         for (const ext of extensions) {
             const imagePath = `../assets/tarot-deck/major-arcana/${index}.${ext}`
+
+            // Debug logging for Wheel of Fortune
+            if (cardName === 'Wheel of Fortune') {
+                console.log(`[TarotDebug] Looking for Wheel of Fortune at: ${imagePath}`)
+                console.log(`[TarotDebug] Exists in map? ${!!cardImages[imagePath]}`)
+                if (!cardImages[imagePath]) {
+                    console.log('[TarotDebug] Available keys:', Object.keys(cardImages))
+                }
+            }
+
             if (cardImages[imagePath]) {
                 return cardImages[imagePath]
             }
@@ -201,7 +280,7 @@ export function toKebabCase(name) {
 }
 
 /**
- * Major Arcana card list
+ * Major Arcana card list (22 cards)
  */
 export const MAJOR_ARCANA = [
     'The Fool',
@@ -229,6 +308,51 @@ export const MAJOR_ARCANA = [
 ]
 
 /**
+ * Minor Arcana suits
+ */
+export const MINOR_ARCANA_SUITS = ['Cups', 'Pentacles', 'Wands', 'Swords']
+
+/**
+ * Minor Arcana ranks (14 per suit)
+ */
+export const MINOR_ARCANA_RANKS = [
+    'Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10',
+    'Page', 'Knight', 'Queen', 'King'
+]
+
+/**
+ * Generate all minor arcana cards (56 cards total)
+ * @returns {Array<Object>} Array of card objects with suit and rank
+ */
+function generateMinorArcanaCards() {
+    const cards = []
+    for (const suit of MINOR_ARCANA_SUITS) {
+        for (const rank of MINOR_ARCANA_RANKS) {
+            cards.push({
+                suit: suit,
+                rank: rank,
+                // Create display name like "Ace of Cups", "2 of Pentacles", etc.
+                name: `${rank} of ${suit}`
+            })
+        }
+    }
+    return cards
+}
+
+/**
+ * Minor Arcana card list (56 cards)
+ */
+export const MINOR_ARCANA = generateMinorArcanaCards()
+
+/**
+ * Full tarot deck (78 cards: 22 major + 56 minor)
+ */
+export const FULL_DECK = [
+    ...MAJOR_ARCANA.map(name => ({ name, arcana: 'major' })),
+    ...MINOR_ARCANA.map(card => ({ ...card, arcana: 'minor' }))
+]
+
+/**
  * Get a random card from Major Arcana
  * @returns {Object} - Card object with name and orientation
  */
@@ -243,7 +367,7 @@ export function drawRandomCard() {
 }
 
 /**
- * Draw multiple random cards (no duplicates)
+ * Draw multiple random cards (no duplicates) from Major Arcana
  * Uses Fisher-Yates shuffle for true randomization
  * @param {number} count - Number of cards to draw
  * @returns {Array} - Array of card objects
@@ -262,5 +386,50 @@ export function drawMultipleCards(count = 3) {
     return deck.slice(0, count).map(cardName => ({
         cardName,
         orientation: Math.random() > 0.5 ? 'upright' : 'reversed'
+    }))
+}
+
+/**
+ * Get a random card from the FULL deck (major + minor arcana)
+ * @returns {Object} - Card object with cardName, orientation, and arcana type
+ */
+export function drawRandomCardFromFullDeck() {
+    const randomCard = FULL_DECK[Math.floor(Math.random() * FULL_DECK.length)]
+    const randomOrientation = Math.random() > 0.5 ? 'upright' : 'reversed'
+
+    return {
+        cardName: randomCard.name,
+        orientation: randomOrientation,
+        arcana: randomCard.arcana,
+        // Include suit and rank for minor arcana cards
+        ...(randomCard.suit && { suit: randomCard.suit }),
+        ...(randomCard.rank && { rank: randomCard.rank })
+    }
+}
+
+/**
+ * Draw multiple random cards (no duplicates) from FULL deck
+ * Uses Fisher-Yates shuffle for true randomization
+ * @param {number} count - Number of cards to draw
+ * @returns {Array} - Array of card objects
+ */
+export function drawMultipleCardsFromFullDeck(count = 3) {
+    // Create a copy of the full deck to shuffle
+    const deck = [...FULL_DECK]
+
+    // Fisher-Yates shuffle algorithm for true randomization
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]]
+    }
+
+    // Take the first 'count' cards and assign random orientations
+    return deck.slice(0, count).map(card => ({
+        cardName: card.name,
+        orientation: Math.random() > 0.5 ? 'upright' : 'reversed',
+        arcana: card.arcana,
+        // Include suit and rank for minor arcana cards
+        ...(card.suit && { suit: card.suit }),
+        ...(card.rank && { rank: card.rank })
     }))
 }
