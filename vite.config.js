@@ -22,7 +22,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // === VENDOR CHUNKS ===
+          // === VENDOR CHUNKS ONLY ===
+          // Only split vendor libraries to avoid circular dependencies in app code
           if (id.includes('node_modules')) {
             // LangChain ecosystem (likely the largest dependency)
             if (id.includes('langchain') || id.includes('@langchain')) {
@@ -48,26 +49,10 @@ export default defineConfig({
             return 'vendor-other'
           }
 
-          // === FEATURE CHUNKS ===
-          // Tarot components and utilities (only loaded when needed)
-          if (id.includes('/components/Tarot') || id.includes('/utils/tarot')) {
-            return 'feature-tarot'
-          }
-
-          // LLM services
-          if (id.includes('/services/llm/')) {
-            return 'feature-llm'
-          }
-
-          // Pinia stores
-          if (id.includes('/stores/')) {
-            return 'feature-stores'
-          }
-
-          // Modal components
-          if (id.includes('Modal.vue')) {
-            return 'feature-modals'
-          }
+          // === NO FEATURE CHUNKS ===
+          // Removed feature chunking to prevent circular dependencies.
+          // App code (components, services, stores, utils) will be in the main chunk
+          // to maintain proper initialization order.
         }
       }
     }

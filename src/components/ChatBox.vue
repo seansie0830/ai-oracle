@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onMounted, watch } from 'vue'
 import MockLLMService from '@/services/llm/MockLLMService'
 import RealLLMService from '@/services/llm/RealLLMService'
 import APIKeyModal from './APIKeyModal.vue'
@@ -21,7 +21,7 @@ import { useI18n } from 'vue-i18n'
 // Store
 const llmConfig = useLLMConfigStore()
 const chatStore = useChatStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 // Error Handler
 const { handleLLMError } = useErrorHandler()
@@ -169,6 +169,20 @@ function handleClearChat() {
   llmService.clearHistory()
 }
 
+// Welcome message ID tracking
+const welcomeMessageId = ref(null)
+
+// Watch for language changes to update welcome message
+watch(locale, () => {
+  if (welcomeMessageId.value) {
+    const newText = useMock 
+      ? t('chat.welcomeDebug')
+      : t('chat.welcome')
+    
+    chatStore.updateMessage(welcomeMessageId.value, { text: newText })
+  }
+})
+
 // Welcome message on mount
 onMounted(() => {
   // Load persisted config if available
@@ -179,8 +193,11 @@ onMounted(() => {
     ? t('chat.welcomeDebug')
     : t('chat.welcome')
   
+  const id = `msg-${messageIdCounter++}`
+  welcomeMessageId.value = id
+
   chatStore.addMessage({
-    id: `msg-${messageIdCounter++}`,
+    id: id,
     text: welcomeText,
     sender: 'oracle',
     type: 'text'

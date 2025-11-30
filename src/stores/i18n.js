@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import i18n from '@/i18n'
+import i18n, { loadLocaleMessages } from '@/i18n'
 
 export const useI18nStore = defineStore('i18n', {
     state: () => ({
@@ -15,7 +15,6 @@ export const useI18nStore = defineStore('i18n', {
     actions: {
         async setLanguage(lang) {
             // Lazy load locale messages before switching
-            const { loadLocaleMessages } = await import('@/i18n')
             await loadLocaleMessages(lang)
 
             this.language = lang

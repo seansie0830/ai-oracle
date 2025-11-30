@@ -211,6 +211,7 @@ const LANGUAGES = [
     name: 'English',
     nativeName: 'English',
     flag: '🇺🇸'
+
   },
   {
     code: 'zh-TW',
@@ -222,7 +223,8 @@ const LANGUAGES = [
 
 async function handleLanguageChange(languageCode) {
   selectedLanguage.value = languageCode
-  i18nStore.setLanguage(languageCode)
+  await i18nStore.setLanguage(languageCode)
+  locale.value = languageCode
 }
 
 function handleDebugModeClick() {
