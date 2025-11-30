@@ -1,3 +1,6 @@
+packages:
+  - '.' # This tells pnpm that the root directory is a workspace package
+
 onlyBuiltDependencies:
   - esbuild
   - sharp
