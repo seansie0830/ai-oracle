@@ -1,10 +1,23 @@
 /**
  * Tarot Card Utility Functions
  * Helper functions for managing tarot card assets and data
+ * 
+ * FALLBACK STRATEGY:
+ * 1. Primary: Load real image assets via Vite glob imports
+ * 2. Format Support: Checks for .png, .jpg, and .webp extensions
+ * 3. Graceful Degradation: Falls back to procedural canvas generation if assets missing
+ * 
+ * This ensures the app works seamlessly with or without image files.
  */
 
-// Use Vite's glob import to eagerly load all card images
+// Use Vite's glob import to eagerly load all card images from major arcana
 const cardImages = import.meta.glob('../assets/tarot-deck/major-arcana/*.{png,jpg,webp}', {
+    eager: true,
+    import: 'default'
+})
+
+// Use Vite's glob import to eagerly load card back images (supports multiple formats)
+const cardBackImages = import.meta.glob('../assets/tarot-deck/card-back.{png,jpg,webp}', {
     eager: true,
     import: 'default'
 })
@@ -63,21 +76,23 @@ export function getCardImage(cardName) {
 
 /**
  * Get card back image
- * Tries to load real card back, falls back to procedural generation
+ * Tries to load real card back from glob import, falls back to procedural generation
+ * Supports multiple formats: png, jpg, webp
  * @returns {string} - Card back image URL or data URI
  */
 export function getCardBack() {
-    // Try to load card-back image
+    // Try to find card back image with different extensions
     const extensions = ['png', 'jpg', 'webp']
 
     for (const ext of extensions) {
         const backPath = `../assets/tarot-deck/card-back.${ext}`
-        if (cardImages[backPath]) {
-            return cardImages[backPath]
+        if (cardBackImages[backPath]) {
+            return cardBackImages[backPath]
         }
     }
 
-    // Fallback to procedural generation
+    // Fallback to procedural generation if no image found
+    console.warn('Card back image not found in assets, using procedural fallback')
     return generatePlaceholderCardBack()
 }
 
