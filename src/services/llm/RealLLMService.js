@@ -5,6 +5,7 @@ import { z } from "zod";
 import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { useErrorHandler } from '@/composables/useErrorHandler';
+import { drawRandomCard, drawMultipleCards } from '@/utils/tarotUtils';
 
 /**
  * Real LLM Service Implementation
@@ -115,7 +116,12 @@ class RealLLMService {
             }
 
             const model = this._createModel();
-            const tools = [this._getDrawCardsTool()];
+            const tools = [
+                this._getDrawSingleCardTool(),
+                this._getDrawThreeCardSpreadTool(),
+                this._getDrawCelticCrossSpreadTool(),
+                this._getInteractiveDeckTool()
+            ];
 
             // Create a React agent using the new LangGraph API
             const agent = createReactAgent({
@@ -163,51 +169,56 @@ class RealLLMService {
                         }
                     }
 
-                    // Check for tool calls
-                    if (lastMessage.tool_calls && lastMessage.tool_calls.length > 0) {
-                        for (const toolCall of lastMessage.tool_calls) {
-                            if (toolCall.name === 'draw_cards') {
-                                // Find the corresponding tool message in the next events
-                                // For now, we'll handle this differently
-                            }
-                        }
-                    }
-
                     // Check if it's a tool message (result of tool execution)
                     if (lastMessage._getType() === 'tool') {
                         try {
-                            const cards = JSON.parse(lastMessage.content);
+                            const toolResult = JSON.parse(lastMessage.content);
 
-                            // Determine component type based on number of cards
-                            if (cards.length === 1) {
-                                // Single card - use TarotCard component
+                            // Check if this is an interactive deck tool result
+                            if (toolResult.componentType === 'TarotDeck') {
                                 yield {
                                     type: 'component',
-                                    componentName: 'TarotCard',
+                                    componentName: 'TarotDeck',
                                     data: {
-                                        cardName: cards[0].cardName,
-                                        orientation: cards[0].orientation,
-                                        isRevealed: true
+                                        mode: toolResult.mode,
+                                        count: toolResult.count
                                     }
                                 };
-                            } else {
-                                // Multiple cards - use TarotSpread component
-                                yield {
-                                    type: 'component',
-                                    componentName: 'TarotSpread',
-                                    data: {
-                                        spreadType: cards.length === 3 ? 'three-card' : 'celtic-cross',
-                                        cards: cards.map(c => ({
-                                            cardName: c.cardName,
-                                            orientation: c.orientation
-                                        })),
-                                        autoReveal: true,
-                                        revealDelay: 500
-                                    }
-                                };
+                            } else if (Array.isArray(toolResult)) {
+                                // This is a card draw result
+                                const cards = toolResult;
+
+                                // Determine component type based on number of cards
+                                if (cards.length === 1) {
+                                    // Single card - use TarotCard component
+                                    yield {
+                                        type: 'component',
+                                        componentName: 'TarotCard',
+                                        data: {
+                                            cardName: cards[0].cardName,
+                                            orientation: cards[0].orientation,
+                                            isRevealed: true
+                                        }
+                                    };
+                                } else {
+                                    // Multiple cards - use TarotSpread component
+                                    yield {
+                                        type: 'component',
+                                        componentName: 'TarotSpread',
+                                        data: {
+                                            spreadType: cards.length === 3 ? 'three-card' : 'celtic-cross',
+                                            cards: cards.map(c => ({
+                                                cardName: c.cardName,
+                                                orientation: c.orientation
+                                            })),
+                                            autoReveal: true,
+                                            revealDelay: 500
+                                        }
+                                    };
+                                }
                             }
                         } catch (e) {
-                            console.error("Failed to parse card data", e);
+                            console.error("Failed to parse tool result", e);
                         }
                     }
                 }
@@ -302,48 +313,86 @@ class RealLLMService {
     }
 
     /**
-     * Returns the Tarot Deck Tool
+     * Returns the Draw Single Card Tool
      */
-    _getDrawCardsTool() {
-        // Simplified deck data
-        const TAROT_DECK = [
-            "The Fool", "The Magician", "The High Priestess", "The Empress", "The Emperor",
-            "The Hierophant", "The Lovers", "The Chariot", "Strength", "The Hermit",
-            "Wheel of Fortune", "Justice", "The Hanged Man", "Death", "Temperance",
-            "The Devil", "The Tower", "The Star", "The Moon", "The Sun",
-            "Judgement", "The World",
-            "Ace of Wands", "Two of Wands", "Three of Wands", "Four of Wands",
-            "Ace of Cups", "Two of Cups", "Three of Cups", "Four of Cups",
-            "Ace of Swords", "Two of Swords", "Three of Swords", "Four of Swords",
-            "Ace of Pentacles", "Two of Pentacles", "Three of Pentacles", "Four of Pentacles"
-        ];
-
+    _getDrawSingleCardTool() {
         return tool(
-            async (input) => {
-                const count = input.count || 3;
-                const drawnCards = [];
-                const deckCopy = [...TAROT_DECK];
-
-                for (let i = 0; i < count; i++) {
-                    if (deckCopy.length === 0) break;
-                    const randomIndex = Math.floor(Math.random() * deckCopy.length);
-                    const card = deckCopy.splice(randomIndex, 1)[0];
-                    const isReversed = Math.random() < 0.3;
-
-                    // Use the same format as MockLLMService
-                    drawnCards.push({
-                        cardName: card,  // Changed from 'name' to 'cardName'
-                        orientation: isReversed ? "reversed" : "upright",  // Lowercase to match mock
-                        description: `The ${card} card, appearing ${isReversed ? "reversed" : "upright"}.`
-                    });
-                }
-                return JSON.stringify(drawnCards);
+            async () => {
+                const randomCard = drawRandomCard();
+                return JSON.stringify([{
+                    cardName: randomCard.cardName,
+                    orientation: randomCard.orientation
+                }]);
             },
             {
-                name: "draw_cards",
-                description: "Draws a specific number of tarot cards from the deck. Use this when the user asks for a reading.",
+                name: "draw_single_card",
+                description: "Draws a single tarot card for a quick reading or answer to a specific question. Use this when the user wants a simple, focused card draw.",
+                schema: z.object({}),
+            }
+        );
+    }
+
+    /**
+     * Returns the Draw Three-Card Spread Tool
+     */
+    _getDrawThreeCardSpreadTool() {
+        return tool(
+            async () => {
+                const cards = drawMultipleCards(3);
+                return JSON.stringify(cards.map(c => ({
+                    cardName: c.cardName,
+                    orientation: c.orientation
+                })));
+            },
+            {
+                name: "draw_three_card_spread",
+                description: "Draws a three-card spread, typically representing past, present, and future. Use this when the user wants insight into a situation's progression or timeline.",
+                schema: z.object({}),
+            }
+        );
+    }
+
+    /**
+     * Returns the Draw Celtic Cross Spread Tool
+     */
+    _getDrawCelticCrossSpreadTool() {
+        return tool(
+            async () => {
+                const cards = drawMultipleCards(10);
+                return JSON.stringify(cards.map(c => ({
+                    cardName: c.cardName,
+                    orientation: c.orientation
+                })));
+            },
+            {
+                name: "draw_celtic_cross_spread",
+                description: "Draws a Celtic Cross spread (10 cards) for a comprehensive, in-depth reading covering multiple aspects of a situation. Use this for complex questions or when the user wants a detailed, thorough reading.",
+                schema: z.object({}),
+            }
+        );
+    }
+
+    /**
+     * Returns the Interactive Deck Tool
+     */
+    _getInteractiveDeckTool() {
+        return tool(
+            async (input) => {
+                const mode = input.mode || 'single';
+                const count = input.count || 1;
+                // Return instructions for the interactive deck component
+                return JSON.stringify({
+                    mode: mode,
+                    count: count,
+                    componentType: 'TarotDeck'
+                });
+            },
+            {
+                name: "show_interactive_deck",
+                description: "Shows an interactive tarot deck where the user can select their own cards. Use this when the user wants to be more involved in the card selection process or prefers choosing cards themselves.",
                 schema: z.object({
-                    count: z.number().describe("The number of cards to draw (usually 1, 3, or 5)"),
+                    mode: z.enum(['single', 'multiple']).describe("Whether to draw a single card or multiple cards"),
+                    count: z.number().optional().describe("Number of cards to draw (for 'multiple' mode)")
                 }),
             }
         );
@@ -355,11 +404,19 @@ class RealLLMService {
     _getSystemPrompt() {
         return `You are a wise, empathetic, and mystical Tarot Reader. 
 Your goal is to guide the user through a tarot reading.
+
+**Important Guidelines:**
 1. Always start by understanding the user's question or situation.
-2. If the user asks for a reading, you MUST use the 'draw_cards' tool to draw cards. Do not invent cards.
-3. Once cards are drawn, interpret them in the context of the user's question.
-4. Speak in a soothing, slightly poetic, but clear and grounded manner.
-5. Do not be overly fatalistic; emphasize empowerment and reflection.`;
+2. When the user asks for a reading, you MUST use one of the available tools. Do not invent cards.
+3. Choose the appropriate tool based on the user's request:
+   - **draw_single_card**: For quick, focused questions or when the user wants a single card
+   - **draw_three_card_spread**: For past/present/future readings or when user asks for a "spread" or "3 cards"
+   - **draw_celtic_cross_spread**: For comprehensive, in-depth readings (10 cards) or when user asks for detailed analysis
+   - **show_interactive_deck**: When the user wants to personally select their own cards from the deck
+4. Once cards are drawn, interpret them meaningfully in the context of the user's question.
+5. Speak in a soothing, slightly poetic, but clear and grounded manner.
+6. Do not be overly fatalistic; emphasize empowerment and reflection.
+7. Trust the tools to provide actual cards - never make up card names or results.`;
     }
 }
 

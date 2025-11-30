@@ -1,9 +1,11 @@
 <script setup>
 import { computed } from 'vue'
 import { useErrorStore } from '@/stores/errorHandler'
+import { useI18n } from 'vue-i18n'
 
 // Store
 const errorStore = useErrorStore()
+const { t } = useI18n()
 
 // Emits for action handlers
 const emit = defineEmits(['retry', 'configure', 'report', 'refresh'])
@@ -213,7 +215,7 @@ function handleKeydown(event) {
               class="glass-panel rounded-xl p-4 border border-white/5"
             >
               <p class="text-[var(--color-secondary-champagne-gold)] text-sm uppercase tracking-wider mb-2 font-bold">
-                💡 Suggestions:
+                💡 {{ t('errorModal.suggestions') }}
               </p>
               <ul class="space-y-1">
                 <li
@@ -233,7 +235,7 @@ function handleKeydown(event) {
               class="glass-panel rounded-xl p-4 border border-white/5"
             >
               <p class="text-[var(--color-secondary-champagne-gold)] text-sm uppercase tracking-wider mb-2 font-bold">
-                ✨ Supported Providers:
+                ✨ {{ t('errorModal.supportedProviders') }}
               </p>
               <ul class="space-y-1">
                 <li
@@ -263,7 +265,7 @@ function handleKeydown(event) {
               class="glass-panel rounded-xl p-3 border border-indigo-500/30 bg-indigo-900/20"
             >
               <p class="text-indigo-300 text-xs">
-                🧪 <strong>Test Mode:</strong> This is a simulated error for UI testing. Real service would handle differently.
+                🧪 <strong>{{ t('errorModal.testMode') }}</strong> {{ t('errorModal.testModeMessage') }}
               </p>
             </div>
             
@@ -274,15 +276,15 @@ function handleKeydown(event) {
             >
               <details class="cursor-pointer">
                 <summary class="text-[var(--color-text-tertiary)] text-sm uppercase tracking-wider mb-2 select-none hover:text-[var(--color-secondary-champagne-gold)] transition-colors">
-                  Technical Details
+                  {{ t('errorModal.technicalDetails') }}
                 </summary>
                 <div class="text-xs text-[var(--color-text-tertiary)] space-y-1 mt-2 font-mono bg-black/30 p-3 rounded-lg">
                   <div v-if="errorStore.currentError.type">
-                    <span class="opacity-60">Error Code:</span> 
+                    <span class="opacity-60">{{ t('errorModal.errorCode') }}</span> 
                     <span class="text-amber-400">{{ errorStore.currentError.type }}</span>
                   </div>
                   <div v-if="errorStore.currentError.timestamp">
-                    <span class="opacity-60">Timestamp:</span> 
+                    <span class="opacity-60">{{ t('errorModal.timestamp') }}</span> 
                     <span class="text-cyan-400">{{ new Date(errorStore.currentError.timestamp).toLocaleString() }}</span>
                   </div>
                   <div v-for="(value, key) in errorStore.currentError.metadata" :key="key">
@@ -323,7 +325,7 @@ function handleKeydown(event) {
                      transition-all duration-300"
               style="font-family: var(--font-family-display);"
             >
-              Dismiss
+              {{ t('common.dismiss') }}
             </button>
           </div>
           
@@ -338,7 +340,7 @@ function handleKeydown(event) {
                      hover:text-[var(--color-tertiary-celestial)]
                      transition-colors duration-300"
             >
-              📋 Copy Error Details
+              📋 {{ t('errorModal.copyError') }}
             </button>
           </div>
         </div>
@@ -346,7 +348,6 @@ function handleKeydown(event) {
     </div>
   </Transition>
 </template>
-
 <style scoped>
 /* Modal Fade Transition */
 .modal-fade-enter-active,

@@ -10,15 +10,24 @@ import TarotDeck from './TarotDeck.vue'
 import { useLLMConfigStore } from '@/stores/llmConfig'
 import { useChatStore } from '@/stores/chat'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import { useMarkdown } from '@/composables/useMarkdown'
 import { storeToRefs } from 'pinia'
 import { tarotComponentRegistry, isValidComponent } from '@/utils/componentRegistry'
+
+import { useI18n } from 'vue-i18n'
+
+// ... (existing imports)
 
 // Store
 const llmConfig = useLLMConfigStore()
 const chatStore = useChatStore()
+const { t } = useI18n()
 
 // Error Handler
 const { handleLLMError } = useErrorHandler()
+
+// Markdown Renderer
+const { renderMarkdown } = useMarkdown()
 
 // State
 const { messages } = storeToRefs(chatStore)
@@ -31,7 +40,6 @@ const showApiKeyModal = ref(false)
 // Initialize LLM service based on URL query param
 const urlParams = new URLSearchParams(window.location.search)
 const useMock = urlParams.has('mock')
-const deckDebugMode = urlParams.has('deck') // Enable tarot components in debug mode
 
 const llmService = useMock 
   ? new MockLLMService({ thinkingDelay: 1200, charDelay: 25 })
@@ -166,10 +174,10 @@ onMounted(() => {
   // Load persisted config if available
   llmConfig.loadFromStorage()
   
-  // Show welcome message with deck mode info
-  const welcomeText = deckDebugMode 
-    ? 'Welcome, seeker. I am the Mystic Oracle. Try /draw, /spread, or /deck to reveal tarot cards in debug mode.'
-    : 'Welcome, seeker. I am the Mystic Oracle. Ask me anything, or try /draw to reveal a tarot card.'
+  // Show welcome message
+  const welcomeText = useMock 
+    ? t('chat.welcomeDebug')
+    : t('chat.welcome')
   
   chatStore.addMessage({
     id: `msg-${messageIdCounter++}`,
@@ -178,8 +186,8 @@ onMounted(() => {
     type: 'text'
   })
   
-  // Auto-show modal if not configured
-  if (!llmConfig.hasValidConfig) {
+  // Auto-show modal if not configured (only in normal mode, not debug/mock mode)
+  if (!useMock && !llmConfig.hasValidConfig) {
     setTimeout(() => {
       showApiKeyModal.value = true
     }, 2000) // 2 second delay for better UX
@@ -268,16 +276,17 @@ onMounted(() => {
             v-else-if="message.sender === 'oracle' && message.type === 'text'"
             class="glass-panel gilded-border hover-lift rounded-3xl max-w-2xl py-5 px-7"
           >
-            <p style="font-family: var(--font-family-serif);" 
-               class="text-[var(--color-text-primary)] font-light leading-relaxed text-lg">
-              {{ message.text }}
-              <span v-if="message.isStreaming" class="typing-cursor"></span>
-            </p>
+            <div 
+              style="font-family: var(--font-family-serif);" 
+              class="markdown-content text-[var(--color-text-primary)] font-light leading-relaxed text-lg"
+              v-html="renderMarkdown(message.text)"
+            ></div>
+            <span v-if="message.isStreaming" class="typing-cursor"></span>
           </div>
 
           <!-- Component Message with Divine Glow -->
           <div
-            v-else-if="message.type === 'component' && deckDebugMode && isValidComponent(message.componentName)"
+            v-else-if="message.type === 'component' && isValidComponent(message.componentName)"
             class="glass-panel gilded-border divine-glow hover-lift rounded-3xl py-6 px-8"
             :class="message.componentName === 'TarotSpread' || message.componentName === 'TarotDeck' ? 'max-w-4xl' : 'max-w-md'"
           >
@@ -285,29 +294,6 @@ onMounted(() => {
               :is="tarotComponentRegistry[message.componentName]"
               v-bind="message.data"
             />
-          </div>
-          
-          <!-- Fallback for component messages when deck mode is disabled -->
-          <div
-            v-else-if="message.type === 'component' && !deckDebugMode"
-            class="glass-panel gilded-border divine-glow hover-lift rounded-3xl max-w-md py-6 px-8"
-          >
-            <div class="text-center">
-              <div class="mb-4">
-                <div class="text-6xl mb-3">🎴</div>
-              </div>
-              <p style="font-family: var(--font-family-display);" 
-                 class="text-[var(--color-secondary-champagne-gold)] text-2xl mb-4 tracking-wide font-bold">
-                {{ message.data.cardName || 'Tarot Component' }}
-              </p>
-              <p style="font-family: var(--font-family-serif);" 
-                 class="text-[var(--color-text-secondary)] text-base italic leading-relaxed">
-                {{ message.data.description || 'Enable deck mode by adding ?deck to URL' }}
-              </p>
-              <p class="text-[var(--color-tertiary-celestial)] text-xs mt-5 opacity-70 tracking-wider">
-
-              </p>
-            </div>
           </div>
 
           <!-- System/Error Message -->
@@ -384,7 +370,8 @@ onMounted(() => {
 
   <!-- API Key Modal -->
   <APIKeyModal 
-    :isOpen="showApiKeyModal" 
+    :isOpen="showApiKeyModal"
+    :isDebugMode="useMock"
     @close="showApiKeyModal = false"
     @save="showApiKeyModal = false"
   />
@@ -398,5 +385,150 @@ onMounted(() => {
 
 
 <style scoped>
-/* Component-specific styles if needed */
+/* Markdown Content Styling */
+.markdown-content :deep(p) {
+  margin-bottom: 1em;
+}
+
+.markdown-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-content :deep(h1),
+.markdown-content :deep(h2),
+.markdown-content :deep(h3),
+.markdown-content :deep(h4),
+.markdown-content :deep(h5),
+.markdown-content :deep(h6) {
+  font-family: var(--font-family-display);
+  color: var(--color-secondary-champagne-gold);
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.markdown-content :deep(h1) { font-size: 2em; }
+.markdown-content :deep(h2) { font-size: 1.75em; }
+.markdown-content :deep(h3) { font-size: 1.5em; }
+.markdown-content :deep(h4) { font-size: 1.25em; }
+.markdown-content :deep(h5) { font-size: 1.1em; }
+.markdown-content :deep(h6) { font-size: 1em; }
+
+.markdown-content :deep(strong) {
+  font-weight: 700;
+  color: var(--color-secondary-rose-gold);
+}
+
+.markdown-content :deep(em) {
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
+.markdown-content :deep(code.inline-code) {
+  background: rgba(157, 78, 221, 0.15);
+  color: var(--color-tertiary-violet);
+  padding: 0.2em 0.5em;
+  border-radius: 0.375rem;
+  font-size: 0.9em;
+  font-family: 'Courier New', monospace;
+  border: 1px solid rgba(157, 78, 221, 0.3);
+}
+
+.markdown-content :deep(pre) {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(244, 228, 193, 0.2);
+  border-radius: 0.75rem;
+  padding: 1em;
+  overflow-x: auto;
+  margin: 1em 0;
+  box-shadow: 0 0 20px rgba(157, 78, 221, 0.2);
+}
+
+.markdown-content :deep(pre code) {
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: 0;
+  border: none;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  line-height: 1.6;
+}
+
+.markdown-content :deep(blockquote) {
+  border-left: 4px solid var(--color-secondary-champagne-gold);
+  padding-left: 1.25em;
+  margin: 1em 0;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  background: rgba(244, 228, 193, 0.05);
+  padding: 1em 1.25em;
+  border-radius: 0.5rem;
+}
+
+.markdown-content :deep(ul),
+.markdown-content :deep(ol) {
+  margin: 1em 0;
+  padding-left: 2em;
+}
+
+.markdown-content :deep(li) {
+  margin-bottom: 0.5em;
+}
+
+.markdown-content :deep(ul li) {
+  list-style-type: disc;
+}
+
+.markdown-content :deep(ol li) {
+  list-style-type: decimal;
+}
+
+.markdown-content :deep(a) {
+  color: var(--color-tertiary-violet);
+  text-decoration: underline;
+  transition: color 0.3s ease;
+}
+
+.markdown-content :deep(a:hover) {
+  color: var(--color-secondary-rose-gold);
+}
+
+.markdown-content :deep(hr) {
+  border: none;
+  border-top: 1px solid rgba(244, 228, 193, 0.3);
+  margin: 2em 0;
+}
+
+.markdown-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+
+.markdown-content :deep(th),
+.markdown-content :deep(td) {
+  border: 1px solid rgba(244, 228, 193, 0.2);
+  padding: 0.75em;
+  text-align: left;
+}
+
+.markdown-content :deep(th) {
+  background: rgba(157, 78, 221, 0.15);
+  color: var(--color-secondary-champagne-gold);
+  font-weight: 700;
+}
+
+.markdown-content :deep(tr:nth-child(even)) {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.markdown-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  margin: 1em 0;
+  box-shadow: 0 0 20px rgba(157, 78, 221, 0.3);
+}
 </style>
+

@@ -1,24 +1,29 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
 import { useLLMConfigStore } from '@/stores/llmConfig'
+import { useI18nStore } from '@/stores/i18n'
 import RealLLMService from '@/services/llm/RealLLMService'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
-  isOpen: Boolean
+  isOpen: Boolean,
+  isDebugMode: Boolean
 })
 
 const emit = defineEmits(['close', 'save'])
 
 const llmConfig = useLLMConfigStore()
+const i18nStore = useI18nStore()
+const { t } = useI18n()
 
 // State
-const selectedProvider = ref(llmConfig.provider)
-const enteredKey = ref(llmConfig.apiKey)
-const selectedModel = ref(llmConfig.selectedModel)
-const persistKeys = ref(llmConfig.persistKeys)
-const showKey = ref(false)
+const selectedProvider = ref('gemini')
+const enteredKey = ref('')
+const selectedModel = ref('')
+const persistKeys = ref(false)
 const isLoadingModels = ref(false)
 const fetchError = ref('')
+const showKey = ref(false)
 
 // Providers Metadata
 const PROVIDERS = {
@@ -67,6 +72,9 @@ watch(() => props.isOpen, (isOpen) => {
     selectedModel.value = llmConfig.selectedModel
     persistKeys.value = llmConfig.persistKeys
     fetchError.value = ''
+    
+    // Sync language from store
+    selectedLanguage.value = i18nStore.language
     
     // If we have a key but no models, try fetching
     if (enteredKey.value && (!availableModels.value || availableModels.value.length === 0)) {
@@ -183,12 +191,59 @@ function handleClickOutside(event) {
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  i18nStore.initLanguage()
 })
 
 // Clean up listener (optional but good practice)
 // onUnmounted(() => {
 //   document.removeEventListener('click', handleClickOutside)
 // })
+
+// Toast notification for debug mode clicks
+const showDebugToast = ref(false)
+let toastTimer = null
+
+// Language settings
+const selectedLanguage = ref('en')
+const LANGUAGES = [
+  {
+    code: 'en',
+    name: 'English',
+    nativeName: 'English',
+    flag: '🇺🇸'
+  },
+  {
+    code: 'zh-TW',
+    name: 'Traditional Chinese (Taiwan)',
+    nativeName: '繁體中文',
+    flag: '🇹🇼'
+  }
+]
+
+async function handleLanguageChange(languageCode) {
+  selectedLanguage.value = languageCode
+  i18nStore.setLanguage(languageCode)
+}
+
+function handleDebugModeClick() {
+  if (!props.isDebugMode) return
+  
+  // Show toast
+  showDebugToast.value = true
+  
+  // Clear existing timer
+  if (toastTimer) clearTimeout(toastTimer)
+  
+  // Auto-hide after 4 seconds
+  toastTimer = setTimeout(() => {
+    showDebugToast.value = false
+  }, 4000)
+}
+
+function dismissToast() {
+  showDebugToast.value = false
+  if (toastTimer) clearTimeout(toastTimer)
+}
 
 function handleSave() {
   if (!enteredKey.value) return
@@ -199,14 +254,17 @@ function handleSave() {
     selectedModel.value,
     persistKeys.value
   )
+  
+  // Language is already saved via handleLanguageChange -> store action
+  
   emit('save')
 }
 
 function handleClose() {
   emit('close')
+  dismissToast() // Clear toast when closing
 }
 </script>
-
 <template>
   <Transition name="modal-fade">
     <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -224,10 +282,10 @@ function handleClose() {
           <div>
             <h2 style="font-family: var(--font-family-display);" 
                 class="text-2xl text-[var(--color-secondary-champagne-gold)] tracking-[0.15em] uppercase font-bold">
-              Configure Oracle
+              {{ t('apiKeyModal.title') }}
             </h2>
             <p class="text-[var(--color-text-tertiary)] text-sm mt-1 font-light">
-              Select your provider and enter API key
+              {{ t('apiKeyModal.subtitle') }}
             </p>
           </div>
           <button @click="handleClose" 
@@ -236,23 +294,47 @@ function handleClose() {
           </button>
         </div>
 
+        <!-- Debug Mode Banner -->
+        <div v-if="isDebugMode" class="mx-6 mt-4 p-4 rounded-xl bg-gradient-to-r from-[rgba(59,130,246,0.15)] to-[rgba(99,102,241,0.15)] border-2 border-[rgba(59,130,246,0.4)]">
+          <div class="flex items-start gap-3">
+            <div class="text-2xl">🧪</div>
+            <div class="flex-1">
+              <h3 class="text-[var(--color-text-primary)] font-bold text-sm mb-1">{{ t('common.debugMode') }}</h3>
+              <p class="text-[var(--color-text-secondary)] text-xs leading-relaxed mb-3">
+                {{ t('apiKeyModal.debugMessage') }}
+              </p>
+              <a :href="window.location.pathname" 
+                 class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[rgba(59,130,246,0.2)] hover:bg-[rgba(59,130,246,0.3)] border border-[rgba(59,130,246,0.5)] text-[var(--color-text-primary)] text-xs font-medium transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]">
+                <span>🚀</span>
+                <span>{{ t('common.switchToReal') }}</span>
+                <span>→</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
         <!-- Content -->
-        <div class="p-8 space-y-8">
+        <div class="p-8 space-y-8" :class="{ 'opacity-50 pointer-events-none': isDebugMode }">
           
           <!-- Provider Selection -->
           <div class="space-y-3">
             <label class="text-[var(--color-text-secondary)] text-sm uppercase tracking-widest opacity-80">
-              Choose Provider
+              {{ t('apiKeyModal.chooseProvider') }}
             </label>
             <div class="grid grid-cols-2 gap-3">
               <button 
                 v-for="provider in PROVIDERS" 
                 :key="provider.id"
-                @click="selectedProvider = provider.id"
+                @click="isDebugMode ? handleDebugModeClick() : (selectedProvider = provider.id)"
+                :disabled="isDebugMode"
                 class="relative p-4 rounded-xl border transition-all duration-300 flex flex-col items-center gap-2 group"
-                :class="selectedProvider === provider.id 
-                  ? 'bg-[rgba(157,78,221,0.15)] border-[var(--color-secondary-champagne-gold)] shadow-[0_0_20px_rgba(157,78,221,0.3)]' 
-                  : 'bg-[rgba(255,255,255,0.03)] border-transparent hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(244,228,193,0.3)]'"
+                :class="[
+                  selectedProvider === provider.id 
+                    ? 'bg-[rgba(157,78,221,0.15)] border-[var(--color-secondary-champagne-gold)] shadow-[0_0_20px_rgba(157,78,221,0.3)]' 
+                    : 'bg-[rgba(255,255,255,0.03)] border-transparent hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(244,228,193,0.3)]',
+                  isDebugMode ? 'cursor-not-allowed' : 'cursor-pointer'
+                ]"
+                :title="isDebugMode ? t('apiKeyModal.disabledInDebug') : ''"
               >
                 <span class="text-2xl filter drop-shadow-lg">{{ provider.icon }}</span>
                 <span class="text-sm font-medium text-[var(--color-text-primary)]">{{ provider.label }}</span>
@@ -265,30 +347,34 @@ function handleClose() {
           </div>
 
           <!-- API Key Input -->
-          <div class="space-y-3">
+          <div class="space-y-3 ">
             <div class="flex justify-between">
               <label class="text-[var(--color-text-secondary)] text-sm uppercase tracking-widest opacity-80">
-                API Key
+                {{ t('apiKeyModal.apiKey') }}
               </label>
               <a :href="currentProvider.helpUrl" target="_blank" 
                  class="text-xs text-[var(--color-secondary-champagne-gold)] hover:underline opacity-80 hover:opacity-100 flex items-center gap-1">
-                Get Key <span>&nearr;</span>
+                {{ t('apiKeyModal.getKey') }} <span>&nearr;</span>
               </a>
             </div>
             
-            <div class="relative group">
+            <div class="relative group" @click="handleDebugModeClick">
               <input 
                 :type="showKey ? 'text' : 'password'"
                 v-model="enteredKey"
                 :placeholder="currentProvider.placeholder"
+                :disabled="isDebugMode"
+                :title="isDebugMode ? t('apiKeyModal.disabledInDebug') : ''"
                 class="w-full bg-[rgba(0,0,0,0.3)] border border-[rgba(244,228,193,0.2)] rounded-xl px-4 py-3 pr-12
                        text-[var(--color-text-primary)] placeholder-[var(--color-text-tertiary)]/30
                        focus:outline-none focus:border-[var(--color-secondary-champagne-gold)] focus:shadow-[0_0_15px_rgba(244,228,193,0.2)]
-                       transition-all duration-300 font-mono text-sm"
+                       transition-all duration-300 font-mono text-sm
+                       disabled:cursor-not-allowed disabled:opacity-50"
               />
               <button 
-                @click="showKey = !showKey"
+                @click.stop="isDebugMode ? handleDebugModeClick() : (showKey = !showKey)"
                 class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
+                :class="{ 'cursor-not-allowed': isDebugMode }"
               >
                 {{ showKey ? '🙈' : '👁️' }}
               </button>
@@ -298,9 +384,9 @@ function handleClose() {
           <!-- Model Selection -->
           <div class="space-y-3">
             <label class="text-[var(--color-text-secondary)] text-sm uppercase tracking-widest opacity-80">
-              Model
+              {{ t('apiKeyModal.model') }}
             </label>
-            <div class="relative" ref="dropdownRef">
+            <div class="relative mt-4" ref="dropdownRef">
               <!-- Dropdown Trigger -->
               <button 
                 @click="toggleDropdown"
@@ -312,7 +398,7 @@ function handleClose() {
                        transition-all duration-300"
               >
                 <span class="truncate">
-                  {{ selectedModelName || (isLoadingModels ? 'Fetching models...' : (hasModels ? 'Select a model' : 'Enter API key to fetch models')) }}
+                  {{ selectedModelName || (isLoadingModels ? t('apiKeyModal.fetchingModels') : (hasModels ? t('apiKeyModal.selectModel') : t('apiKeyModal.enterKeyToFetch'))) }}
                 </span>
                 
                 <!-- Spinner or Arrow -->
@@ -346,7 +432,7 @@ function handleClose() {
                   <!-- Options List -->
                   <div class="max-h-60 overflow-y-auto custom-scrollbar">
                     <div v-if="filteredModels.length === 0" class="p-4 text-center text-[var(--color-text-tertiary)] text-sm">
-                      No models found
+                      {{ t('apiKeyModal.noModelsFound') }}
                     </div>
                     <button 
                       v-for="model in filteredModels" 
@@ -375,14 +461,41 @@ function handleClose() {
               class="mt-1 accent-[var(--color-secondary-champagne-gold)] w-4 h-4 cursor-pointer" 
             />
             <label for="persist" class="cursor-pointer">
-              <span class="block text-[var(--color-text-primary)] text-sm font-medium">Trust this device</span>
+              <span class="block text-[var(--color-text-primary)] text-sm font-medium">{{ t('apiKeyModal.trustDevice') }}</span>
               <span class="block text-[var(--color-text-tertiary)] text-xs mt-0.5">
-                Save API key in browser storage. Only enable on personal, secure devices.
+                {{ t('apiKeyModal.trustDeviceSubtitle') }}
               </span>
             </label>
           </div>
 
+          <!-- Language Selection -->
+          <div class="space-y-3">
+            <label class="text-[var(--color-text-secondary)] text-sm uppercase tracking-widest opacity-80 ">
+              {{ t('apiKeyModal.language') }}
+            </label>
+            <div class="grid grid-cols-2 gap-3 mt-4">
+              <button 
+                v-for="language in LANGUAGES" 
+                :key="language.code"
+                @click="handleLanguageChange(language.code)"
+                class="relative p-4 rounded-xl border transition-all duration-300 flex flex-col items-center gap-2 group cursor-pointer"
+                :class="[
+                  selectedLanguage === language.code 
+                    ? 'bg-[rgba(157,78,221,0.15)] border-[var(--color-secondary-champagne-gold)] shadow-[0_0_20px_rgba(157,78,221,0.3)]' 
+                    : 'bg-[rgba(255,255,255,0.03)] border-transparent hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(244,228,193,0.3)]'
+                ]"
+              >
+                <span class="text-2xl filter drop-shadow-lg">{{ language.flag }}</span>
+                <span class="text-sm font-medium text-[var(--color-text-primary)]">{{ language.nativeName }}</span>
+                
+                <!-- Active Indicator -->
+                <div v-if="selectedLanguage === language.code" 
+                     class="absolute top-2 right-2 w-2 h-2 rounded-full bg-[var(--color-tertiary-emerald)] shadow-[0_0_8px_var(--color-tertiary-emerald)]"></div>
+              </button>
+            </div>
+          </div>
         </div>
+
 
         <!-- Footer -->
         <div class="p-6 border-t border-[rgba(244,228,193,0.1)] flex gap-4">
@@ -391,11 +504,12 @@ function handleClose() {
             class="flex-1 py-3 rounded-xl border border-[rgba(244,228,193,0.2)] text-[var(--color-text-secondary)]
                    hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--color-text-primary)] transition-all duration-300"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button 
-            @click="handleSave"
-            :disabled="!enteredKey || !selectedModel"
+            @click="isDebugMode ? handleDebugModeClick() : handleSave()"
+            :disabled="isDebugMode || !enteredKey || !selectedModel"
+            :title="isDebugMode ? t('apiKeyModal.disabledInDebug') : ''"
             class="flex-1 py-3 rounded-xl bg-gradient-to-r from-[var(--color-secondary-rose-gold)] to-[var(--color-secondary-burnished-bronze)]
                    text-[var(--color-background-pure-black)] font-bold tracking-wide uppercase
                    shadow-[0_0_20px_rgba(244,228,193,0.3)]
@@ -403,11 +517,43 @@ function handleClose() {
                    disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
                    transition-all duration-300"
           >
-            Save Configuration
+            {{ isDebugMode ? t('common.debugMode') : t('apiKeyModal.saveConfig') }}
           </button>
         </div>
 
       </div>
+
+      <!-- Debug Mode Toast Notification -->
+      <Transition name="toast-slide">
+        <div v-if="showDebugToast" 
+             class="fixed top-6 right-6 z-[60] max-w-md glass-panel border-2 border-[rgba(59,130,246,0.6)] rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5),0_0_30px_rgba(59,130,246,0.3)] overflow-hidden">
+          <div class="relative bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(99,102,241,0.15)] p-5">
+            <button 
+              @click="dismissToast"
+              class="absolute top-3 right-3 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors text-xl leading-none"
+            >
+              ×
+            </button>
+            
+            <div class="flex items-start gap-4 pr-6">
+              <div class="text-3xl flex-shrink-0">🧪</div>
+              <div>
+                <h4 class="text-[var(--color-text-primary)] font-bold text-base mb-2">
+                  {{ t('common.debugMode') }}
+                </h4>
+                <p class="text-[var(--color-text-secondary)] text-sm leading-relaxed mb-3">
+                  {{ t('apiKeyModal.disabledInDebug') }}
+                </p>
+                <a :href="window.location.pathname" 
+                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[rgba(59,130,246,0.3)] hover:bg-[rgba(59,130,246,0.4)] border border-[rgba(59,130,246,0.6)] text-[var(--color-text-primary)] text-sm font-medium transition-all duration-300 hover:shadow-[0_0_15px_rgba(59,130,246,0.4)]">
+                  <span>🚀</span>
+                  <span>{{ t('common.switchToReal') }}</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
     </div>
   </Transition>
 </template>
@@ -457,5 +603,21 @@ function handleClose() {
 .dropdown-fade-leave-to {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+/* Toast notification animations */
+.toast-slide-enter-active,
+.toast-slide-leave-active {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toast-slide-enter-from {
+  opacity: 0;
+  transform: translateX(100%) translateY(-20px);
+}
+
+.toast-slide-leave-to {
+  opacity: 0;
+  transform: translateX(100%);
 }
 </style>

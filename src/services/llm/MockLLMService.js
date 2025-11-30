@@ -5,6 +5,7 @@
  */
 
 import { drawRandomCard, drawMultipleCards } from '../../utils/tarotUtils'
+import i18n from '../../i18n'
 
 class MockLLMService {
   constructor(options = {}) {
@@ -119,22 +120,45 @@ class MockLLMService {
       return;
     }
 
+    if (command === '/markdown' || command === '/md') {
+      // Test markdown rendering capabilities
+      const markdownDemo = i18n.global.t('mock.markdownDemo');
+
+      // Stream the markdown response
+      let buffer = '';
+      for (const char of markdownDemo) {
+        buffer += char;
+        yield {
+          type: 'text',
+          chunk: char,
+          fullText: buffer
+        };
+        await this.delay(this.charDelay);
+      }
+
+      yield {
+        type: 'done',
+        fullText: buffer
+      };
+      return;
+    }
+
     // Error simulation commands for testing
     if (command === '/error' || command === '/error-mystical') {
-      const error = new Error('The cosmic energies are in flux. The oracle cannot divine at this moment.');
+      const error = new Error(i18n.global.t('mock.errors.mystical'));
       error.code = 'MYSTICAL_ERROR';
       throw error;
     }
 
     if (command === '/error-network') {
-      const error = new Error('Network connection lost');
+      const error = new Error(i18n.global.t('mock.errors.network'));
       error.name = 'NetworkError';
       error.code = 'NETWORK_ERROR';
       throw error;
     }
 
     if (command === '/error-timeout') {
-      const error = new Error('Request timeout after 30 seconds');
+      const error = new Error(i18n.global.t('mock.errors.timeout'));
       error.code = 'TIMEOUT';
       error.timeout = 30000;
       throw error;
@@ -142,7 +166,7 @@ class MockLLMService {
 
     if (command === '/error-stream') {
       // Simulate streaming then error mid-stream
-      const partialResponse = 'The cards reveal...';
+      const partialResponse = i18n.global.t('chat.thinking'); // Reusing thinking text as partial
       let buffer = '';
       for (const char of partialResponse) {
         buffer += char;
@@ -155,13 +179,13 @@ class MockLLMService {
       }
 
       // Then throw error
-      const error = new Error('Streaming connection interrupted');
+      const error = new Error(i18n.global.t('mock.errors.streaming'));
       error.code = 'STREAMING_ERROR';
       throw error;
     }
 
     if (command === '/error-rate') {
-      const error = new Error('Rate limit exceeded. Please try again in 60 seconds.');
+      const error = new Error(i18n.global.t('mock.errors.rateLimit'));
       error.code = 'RATE_LIMIT';
       error.retryAfter = 60;
       throw error;
@@ -195,17 +219,13 @@ class MockLLMService {
    * @returns {string}
    */
   generateMockResponse(userMessage) {
-    const responses = [
-      `The cards whisper secrets about "${userMessage}"... The mystic energies reveal a path of transformation and enlightenment ahead.`,
-      `I sense your question about "${userMessage}" carries great weight. The oracle shows a journey of discovery awaits you.`,
-      `The cosmic forces align in response to your query: "${userMessage}". Look within, for the answer has always resided in your soul.`,
-      `Ah, you seek wisdom regarding "${userMessage}". The ancient tarot speaks of balance, patience, and hidden truths yet to be unveiled.`,
-      `Your words "${userMessage}" resonate with the ethereal realm. The spirits suggest caution mixed with courage on your path forward.`
-    ];
+    const responses = i18n.global.tm('mock.responses');
 
     // Select a random response
     const randomIndex = Math.floor(Math.random() * responses.length);
-    return responses[randomIndex];
+    const template = responses[randomIndex];
+
+    return template.replace('{query}', userMessage);
   }
 
   /**
@@ -225,7 +245,7 @@ class MockLLMService {
     await this.delay(this.thinkingDelay);
 
     if (userMessage.trim().toLowerCase() === '/error') {
-      throw new Error('Mock LLM Error: Something went wrong with the mystical connection');
+      throw new Error(i18n.global.t('mock.errors.generic'));
     }
 
     return this.generateMockResponse(userMessage);
