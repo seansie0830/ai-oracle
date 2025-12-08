@@ -145,7 +145,14 @@ const magic = () => {
         majorArcana: 'Major Arcana',
         minorArcana: 'Minor Arcana',
         meaning: 'Meaning',
-        keywords: 'Keywords'
+        keywords: 'Keywords',
+        showing: 'Showing',
+        of: 'of',
+        cards: 'cards',
+        previous: 'Previous',
+        next: 'Next',
+        itemsPerPage: 'Items per page',
+        all: 'All'
     },
     cards: {
         the_fool: {

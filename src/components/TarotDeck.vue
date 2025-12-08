@@ -21,7 +21,7 @@ const emit = defineEmits(['draw', 'cardDrawn'])
 // State
 const isDrawing = ref(false)
 const drawnCards = ref([])
-const deckPosition = ref({ x: 0, y: 0 })
+
 
 // Get card back image
 const backImage = computed(() => getCardBack())
@@ -126,6 +126,7 @@ defineExpose({ reset })
           :orientation="card.orientation"
           :is-revealed="true"
           size="medium"
+          behavior="one-way"
         />
       </div>
     </div>

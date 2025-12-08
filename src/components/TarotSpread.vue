@@ -90,6 +90,7 @@ defineExpose({ revealAll })
           :orientation="card.orientation"
           :is-revealed="isCardRevealed(index)"
           :size="spreadType === 'celtic-cross' ? 'small' : 'medium'"
+          behavior="one-way"
         />
         <div 
           v-if="getPositionLabel(index)" 

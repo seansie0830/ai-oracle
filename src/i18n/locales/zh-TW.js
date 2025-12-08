@@ -145,7 +145,14 @@ const magic = () => {
         majorArcana: '大阿爾克那',
         minorArcana: '小阿爾克那',
         meaning: '牌義',
-        keywords: '關鍵字'
+        keywords: '關鍵字',
+        showing: '顯示',
+        of: '共',
+        cards: '張卡牌',
+        previous: '上一頁',
+        next: '下一頁',
+        itemsPerPage: '每頁顯示',
+        all: '全部'
     },
     cards: {
         the_fool: {
@@ -459,7 +466,7 @@ const magic = () => {
         queen_of_pentacles: {
             meaning: '錢幣皇后代表務實，家庭，母性，腳踏實地，安全。',
             keywords: '務實，家庭，母性，腳踏實地，安全'
-},
+        },
         king_of_pentacles: {
             meaning: '錢幣國王代表財富，商業，領導力，安全，紀律，富足。',
             keywords: '財富，商業，領導力，安全，紀律，富足'

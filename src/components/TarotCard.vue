@@ -20,6 +20,11 @@ const props = defineProps({
     type: String,
     default: 'medium',
     validator: (value) => ['small', 'medium', 'large'].includes(value)
+  },
+  behavior: {
+    type: String,
+    default: 'normal',
+    validator: (value) => ['normal', 'one-way', 'block'].includes(value)
   }
 })
 
@@ -49,6 +54,19 @@ function reveal() {
 
 // Flip manually (for interactive mode)
 function flip() {
+  // Respect the behavior prop
+  if (props.behavior === 'block') {
+    // Do nothing, flipping is disabled
+    return
+  }
+  if (props.behavior === 'one-way') {
+    // Allow flip only if currently not revealed
+    if (!localRevealed.value) {
+      localRevealed.value = true
+    }
+    return
+  }
+  // Normal behavior: toggle freely
   localRevealed.value = !localRevealed.value
 }
 
