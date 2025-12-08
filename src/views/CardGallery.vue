@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useI18nStore } from '@/stores/i18n'
 import { FULL_DECK } from '@/utils/tarotUtils'
 import TarotCard from '@/components/TarotCard.vue'
+import CardDetailsModal from '@/components/CardDetailsModal.vue'
 
 // Reactive route query params (e.g., /gallery?search=foo&cardId=bar&category=major&page=2&perPage=24)
 const route = useRoute()
@@ -30,6 +31,8 @@ const searchQuery = ref('')
 const selectedSuit = ref('all')
 const selectedCard = ref(null)
 const isModalOpen = ref(false)
+const showCardModal = ref(false)
+
 
 // Pagination state
 const currentPage = ref(1)
@@ -122,11 +125,8 @@ function updateURL(params) {
   router.replace({ query })
 }
 
-// Helper to get translation key for card
-function getCardTranslationKey(cardName) {
-  // Convert "The Fool" to "the_fool", "Ace of Cups" to "ace_of_cups"
-  return cardName.toLowerCase().replace(/\s+/g, '_')
-}
+
+
 
 // Pagination methods
 function goToPage(page) {
@@ -378,42 +378,22 @@ watch(itemsPerPage, (newVal, oldVal) => {
     </div>
 
     <!-- Details Modal -->
-    <div v-if="isModalOpen" class="modal-overlay" @click="closeModal">
-      <div class="modal-content" @click.stop>
-        <button class="close-button" @click="closeModal">×</button>
-        
-        <div class="modal-body">
-          <div class="modal-image-container">
-            <TarotCard 
-              :cardName="selectedCard.name" 
-              size="large"
-              :isRevealed="true"
-              behavior="one-way"
-            />
-          </div>
-          
-          <div class="modal-info">
-            <h2 class="modal-title">{{ selectedCard.name }}</h2>
-            <div class="modal-tags">
-              <span class="tag arcana-tag">
-                {{ selectedCard.arcana === 'major' ? t('gallery.majorArcana') : t('gallery.minorArcana') }}
-              </span>
-              <span v-if="selectedCard.suit" class="tag suit-tag">
-                {{ selectedCard.suit }}
-              </span>
-            </div>
-            
-            <div class="card-meaning">
-              <h3>{{ t('gallery.meaning') }}</h3>
-              <p>{{ t(`cards.${getCardTranslationKey(selectedCard.name)}.meaning`) }}</p>
-              
-              <h3>{{ t('gallery.keywords') }}</h3>
-              <p>{{ t(`cards.${getCardTranslationKey(selectedCard.name)}.keywords`) }}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <CardDetailsModal 
+      :isOpen="isModalOpen" 
+      :card="selectedCard" 
+      @close="closeModal" 
+      @show-zoom="showCardModal = true"
+    />
+
+    <!-- TarotCard Modal Overlay (upper layer) -->
+    <TarotCard 
+      v-if="isModalOpen && selectedCard && showCardModal"
+      :cardName="selectedCard.name" 
+      size="modal"
+      :isRevealed="true"
+      behavior="one-way"
+      @close="showCardModal = false"
+    />
   </div>
 </template>
 
@@ -732,117 +712,9 @@ watch(itemsPerPage, (newVal, oldVal) => {
   font-weight: bold;
 }
 
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(5px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  padding: 2rem;
-}
 
-.modal-content {
-  background: linear-gradient(135deg, #2a1b3d 0%, #1a1025 100%);
-  border: 1px solid #d4af37;
-  border-radius: 20px;
-  width: 100%;
-  max-width: 900px;
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-  box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
-}
-
-.close-button {
-  position: absolute;
-  top: 1rem;
-  right: 1.5rem;
-  background: none;
-  border: none;
-  color: #f4e4c1;
-  font-size: 2rem;
-  cursor: pointer;
-  z-index: 10;
-}
-
-.modal-body {
-  display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 3rem;
-  padding: 3rem;
-}
-
-.modal-image-container {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-}
-
-.modal-info {
-  color: #f4e4c1;
-}
-
-.modal-title {
-  font-family: 'Cinzel', serif;
-  font-size: 2.5rem;
-  margin: 0 0 1rem;
-  color: #d4af37;
-}
-
-.modal-tags {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-.tag {
-  padding: 0.25rem 0.75rem;
-  border-radius: 15px;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.arcana-tag {
-  background: rgba(157, 78, 221, 0.3);
-  border: 1px solid #9d4edd;
-}
-
-.suit-tag {
-  background: rgba(212, 175, 55, 0.2);
-  border: 1px solid #d4af37;
-}
-
-.card-meaning h3 {
-  font-family: 'Cinzel', serif;
-  color: #d4af37;
-  margin: 1.5rem 0 0.5rem;
-  font-size: 1.2rem;
-}
-
-.card-meaning p {
-  line-height: 1.6;
-  color: rgba(244, 228, 193, 0.9);
-}
 
 @media (max-width: 768px) {
-  .modal-body {
-    grid-template-columns: 1fr;
-    gap: 2rem;
-    padding: 2rem;
-  }
-  
-  .modal-image-container {
-    margin-bottom: 1rem;
-  }
-  
   .title {
     font-size: 2rem;
   }

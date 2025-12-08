@@ -19,7 +19,201 @@
 </head>
 
 <body>
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="crystal-ball"></div>
+    <h2 class="title">Mystic Oracle</h2>
+    <div class="dots"><i></i><i></i><i></i></div>
+  </div>
+
   <div id="app"></div>
+
+  <style>
+    #loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(ellipse at center, #2d1950 0%, #1a0033 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      opacity: 1;
+      transition: opacity .6s
+    }
+
+    #loading-screen.hide {
+      opacity: 0;
+      pointer-events: none
+    }
+
+    .crystal-ball {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, rgba(138, 43, 226, .3), rgba(75, 0, 130, .9));
+      box-shadow: 0 0 40px rgba(138, 43, 226, .7), inset -10px -10px 30px rgba(0, 0, 0, .5), inset 10px 10px 20px rgba(255, 255, 255, .1);
+      animation: pulse 3s ease-in-out infinite;
+      position: relative
+    }
+
+    .crystal-ball::before {
+      content: '✦';
+      position: absolute;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 28px;
+      color: #ffd700;
+      animation: twinkle 2s ease-in-out infinite
+    }
+
+    .crystal-ball::after {
+      content: '';
+      position: absolute;
+      top: 25%;
+      left: 30%;
+      width: 25px;
+      height: 25px;
+      background: radial-gradient(circle, rgba(255, 255, 255, .7), transparent);
+      border-radius: 50%;
+      animation: shimmer 2s ease-in-out infinite
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        transform: scale(1);
+        box-shadow: 0 0 40px rgba(138, 43, 226, .7), inset -10px -10px 30px rgba(0, 0, 0, .5), inset 10px 10px 20px rgba(255, 255, 255, .1)
+      }
+
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 60px rgba(138, 43, 226, 1), inset -10px -10px 30px rgba(0, 0, 0, .5), inset 10px 10px 20px rgba(255, 255, 255, .15)
+      }
+    }
+
+    @keyframes shimmer {
+
+      0%,
+      100% {
+        opacity: .5
+      }
+
+      50% {
+        opacity: 1
+      }
+    }
+
+    @keyframes twinkle {
+
+      0%,
+      100% {
+        opacity: .4;
+        transform: translateX(-50%) scale(1)
+      }
+
+      50% {
+        opacity: 1;
+        transform: translateX(-50%) scale(1.2)
+      }
+    }
+
+    .title {
+      font-family: 'Cinzel', serif;
+      font-size: 2.2rem;
+      font-weight: 700;
+      margin: 30px 0 0;
+      background: linear-gradient(135deg, #ffd700, #ff69b4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 15px rgba(255, 215, 0, .6))
+    }
+
+    .dots {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px
+    }
+
+    .dots i {
+      display: block;
+      width: 8px;
+      height: 8px;
+      background: #ffd700;
+      border-radius: 50%;
+      animation: bounce 1.4s ease-in-out infinite
+    }
+
+    .dots i:nth-child(2) {
+      animation-delay: .2s
+    }
+
+    .dots i:nth-child(3) {
+      animation-delay: .4s
+    }
+
+    @keyframes bounce {
+
+      0%,
+      80%,
+      100% {
+        transform: translateY(0);
+        opacity: .6
+      }
+
+      40% {
+        transform: translateY(-12px);
+        opacity: 1
+      }
+    }
+
+    @media(max-width:768px) {
+      .crystal-ball {
+        width: 80px;
+        height: 80px
+      }
+
+      .title {
+        font-size: 1.8rem
+      }
+    }
+  </style>
+
+  <script>
+    (function () {
+      var l = document.getElementById('loading-screen'), a = document.getElementById('app'), t, o;
+      function h() { if (l && !l.classList.contains('hide')) { l.classList.add('hide'); setTimeout(function () { l.remove() }, 600) } }
+      function e() {
+        // Show error message if Vue fails to hydrate
+        var title = l.querySelector('.title'), dots = l.querySelector('.dots');
+        if (dots) dots.style.display = 'none';
+        if (title) {
+          title.textContent = 'Loading Failed';
+          title.style.color = '#ff6b6b';
+        }
+        var msg = document.createElement('p');
+        msg.style.cssText = 'color:#d8b4fe;font-size:1rem;margin:20px 0;font-family:Inter,sans-serif';
+        msg.textContent = 'Unable to load the application. Please check your connection.';
+        var btn = document.createElement('button');
+        btn.textContent = 'Reload Page';
+        btn.style.cssText = 'background:linear-gradient(135deg,#ffd700,#ffa500);border:none;padding:12px 24px;border-radius:8px;color:#000;font-weight:600;cursor:pointer;font-size:1rem;margin-top:10px';
+        btn.onclick = function () { location.reload() };
+        l.appendChild(msg);
+        l.appendChild(btn);
+      }
+      // Fallback: show error after 10s if Vue never hydrates
+      t = setTimeout(e, 10000);
+      // Primary detection: hide when Vue renders content
+      if (a) { o = new MutationObserver(function () { if (a.children.length > 0) { clearTimeout(t); h(); o.disconnect() } }); o.observe(a, { childList: true, subtree: true }) }
+    })();
+  </script>
+
   <script type="module" src="/src/main.js"></script>
 </body>
 

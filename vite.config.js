@@ -4,7 +4,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
-import { ViteImageOptimizer } from'vite-plugin-image-optimizer';
+import{ imagetools} from 'vite-imagetools'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -12,11 +12,13 @@ export default defineConfig({
     vue(),
     vueDevTools(),
     tailwindcss(),
-    ViteImageOptimizer({
-       png: { quality: 80 },
-       jpeg: { quality: 75 },
-       svg: { multipass: true },
-     })
+    imagetools({
+      defaultDirectives: new URLSearchParams({
+        format: 'webp',
+        quality: '78',      // 這是你要求的「不要看不清」，80 幾乎看不出損失
+        effort: '6'
+      })       // 0-6，設為 5 會花更多時間計算如何壓得更小，不傷畫質
+    })
   ],
   resolve: {
     alias: {

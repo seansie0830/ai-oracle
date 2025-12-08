@@ -24,8 +24,10 @@
     "@langchain/openai": "^1.1.3",
     "@langchain/xai": "^1.0.2",
     "@tailwindcss/vite": "^4.1.17",
+    "bootstrap-icons": "^1.13.1",
     "dompurify": "^3.3.0",
     "langchain": "^1.1.1",
+    "lucide-vue-next": "^0.556.0",
     "marked": "^17.0.1",
     "openai": "^6.9.1",
     "pinia": "^3.0.4",
@@ -37,6 +39,7 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@bro-academy/vite-plugin-image-optimizer": "^0.0.2",
     "@eslint/js": "^9.39.1",
     "@types/dompurify": "^3.2.0",
     "@vitejs/plugin-vue": "^6.0.2",
@@ -49,8 +52,14 @@
     "sharp": "^0.34.5",
     "svgo": "^4.0.0",
     "vite": "^7.2.4",
+    "vite-imagetools": "^9.0.2",
     "vite-plugin-image-optimizer": "^2.0.3",
     "vite-plugin-vue-devtools": "^8.0.5",
     "vitest": "^4.0.14"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite": "npm:rolldown-vite@latest"
+    }
   }
 }

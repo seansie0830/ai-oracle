@@ -1,6 +1,8 @@
 packages:
-  - '.' # This tells pnpm that the root directory is a workspace package
+  - .
 
 onlyBuiltDependencies:
+  - cwebp-bin
+  - es5-ext
   - esbuild
   - sharp

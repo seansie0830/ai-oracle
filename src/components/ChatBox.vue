@@ -11,6 +11,7 @@ import { useMarkdown } from '@/composables/useMarkdown'
 import { storeToRefs } from 'pinia'
 import { tarotComponentRegistry, isValidComponent } from '@/utils/componentRegistry'
 
+
 import { useI18n } from 'vue-i18n'
 
 // ... (existing imports)
@@ -229,34 +230,35 @@ onMounted(() => {
   <div class="flex justify-center min-h-screen w-full bg-transparent">
     <div class="flex flex-col h-screen w-full max-w-5xl">
     <!-- Premium Header with Gilded Border -->
-    <header class="glass-panel border-b border-[rgba(244,228,193,0.3)] shimmer py-2 px-6">
-      <div class="max-w-4xl mx-auto flex items-center justify-between">
+    <header class="glass-panel border-b border-[rgba(244,228,193,0.3)] shimmer py-2 px-3 sm:px-6">
+      <div class="max-w-4xl mx-auto flex items-center justify-between gap-1 sm:gap-0">
         <!-- Clear Button -->
         <button
           @click="handleClearChat"
-          class="mr-4 text-2xl text-[var(--color-text-tertiary)] 
+          class="mr-1 sm:mr-4 text-xl sm:text-2xl text-[var(--color-text-tertiary)] 
                  hover:text-[var(--color-secondary-rose-gold)]
-                 hover:scale-110 transition-all duration-300"
+                 hover:scale-110 transition-all duration-300 shrink-0"
           aria-label="Clear Chat"
           title="Clear Chat History"
         >
           🧹
         </button>
 
-        <div class="flex-1">
+        <div class="flex-1 min-w-0">
           <h1 style="font-family: var(--font-family-display);" 
-              class="text-4xl  font-black text-[var(--color-secondary-champagne-gold)] 
-                     tracking-[0.3em] text-center uppercase drop-shadow-[0_2px_10px_rgba(244,228,193,0.3)]">
-            ✦ Mystic Oracle ✦
+              class="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-black text-[var(--color-secondary-champagne-gold)] 
+                     tracking-widest sm:tracking-[0.2em] md:tracking-[0.3em] text-center uppercase 
+                     drop-shadow-[0_2px_10px_rgba(244,228,193,0.3)] whitespace-nowrap overflow-hidden text-ellipsis">
+            <span class="hidden sm:inline">✦ </span>Mystic Oracle<span class="hidden sm:inline"> ✦</span>
           </h1>
         </div>
         
         <!-- Gallery Link -->
         <router-link
           to="/gallery"
-          class="ml-4 text-2xl text-[var(--color-text-tertiary)] 
+          class="ml-1 sm:ml-4 text-xl sm:text-2xl text-[var(--color-text-tertiary)] 
                  hover:text-[var(--color-secondary-champagne-gold)]
-                 hover:scale-110 transition-all duration-300"
+                 hover:scale-110 transition-all duration-300 shrink-0"
           aria-label="Card Gallery"
           title="View Card Gallery"
         >
@@ -266,10 +268,10 @@ onMounted(() => {
         <!-- Settings Button -->
         <button
           @click="showApiKeyModal = true"
-          class="ml-4 text-2xl text-[var(--color-text-tertiary)] 
+          class="ml-1 sm:ml-4 text-xl sm:text-2xl text-[var(--color-text-tertiary)] 
                  hover:text-[var(--color-secondary-champagne-gold)]
                  hover:rotate-45 transition-all duration-300
-                 relative"
+                 relative shrink-0"
           :class="{ 'text-[var(--color-tertiary-emerald)]': llmConfig.hasValidConfig }"
           aria-label="Settings"
           title="Configure API Key"
@@ -383,8 +385,8 @@ onMounted(() => {
     </div>
 
     <!-- Luxury Input Area with Max Width -->
-    <div class="glass-panel border-t border-[rgba(244,228,193,0.3)] py-6 px-6">
-      <div class="flex gap-4 max-w-4xl mx-auto">
+    <div class="glass-panel border-t border-[rgba(244,228,193,0.3)] py-3 px-3 sm:px-6">
+      <div class="flex gap-2 sm:gap-4 max-w-4xl mx-auto">
         <input
           v-model="input"
           @keypress="handleKeyPress"
@@ -394,9 +396,9 @@ onMounted(() => {
           autocorrect="off"
           autocapitalize="off"
           spellcheck="false"
-          class="flex-1 rounded-2xl glass-panel py-5 px-7
+          class="flex-1 rounded-2xl glass-panel py-3 px-4 sm:px-7
                  border-2 border-[rgba(244,228,193,0.25)]
-                 text-[var(--color-text-secondary)] text-lg
+                 text-[var(--color-text-secondary)] text-base sm:text-lg
                  placeholder-[var(--color-text-tertiary)]/40
                  focus:outline-none focus:border-[rgba(244,228,193,0.5)] 
                  focus:shadow-[0_0_30px_rgba(157,78,221,0.4)]
@@ -408,21 +410,21 @@ onMounted(() => {
         <button
           @click="sendMessage"
           :disabled="!input.trim() || isThinking"
-          style="font-family: var(--font-family-display);"
-          class="rounded-2xl font-bold text-base py-5 px-10
-                 bg-gradient-to-r from-[var(--color-secondary-rose-gold)] 
-                 via-[var(--color-secondary-champagne-gold)] 
-                 to-[var(--color-secondary-burnished-bronze)]
-                 text-[var(--color-background-pure-black)] 
-                 uppercase tracking-[0.2em]
+          class="rounded-2xl text-2xl sm:text-3xl p-3 sm:p-4 shrink-0
+                 bg-linear-to-r from-secondary-rose-gold 
+                 via-(--color-secondary-champagne-gold) 
+                 to-secondary-burnished-bronze
+                 text-background-pure-black 
                  shadow-[0_0_20px_rgba(244,228,193,0.5)]
                  hover:shadow-[0_0_40px_rgba(244,228,193,0.7)]
-                 hover:scale-[1.02]
+                 hover:scale-110
                  disabled:opacity-40 disabled:cursor-not-allowed
                  disabled:hover:scale-100 disabled:hover:shadow-none
-                 transition-all duration-500 ease-out"
+                 transition-all duration-300 ease-out"
+          aria-label="Send Message"
+          title="Send Message"
         >
-          ✨ Send
+          <i class="bi bi-arrow-up-circle-fill"></i>
         </button>
       </div>
     </div>
