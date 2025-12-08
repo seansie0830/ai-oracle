@@ -416,6 +416,7 @@ watch(itemsPerPage, (newVal, oldVal) => {
   position: absolute;
   left: 0;
   top: 0;
+  z-index: 10;
   background: none;
   border: 1px solid rgba(244, 228, 193, 0.3);
   color: #f4e4c1;
@@ -437,6 +438,7 @@ watch(itemsPerPage, (newVal, oldVal) => {
   position: absolute;
   right: 0;
   top: 0;
+  z-index: 10;
   display: flex;
   gap: 0.5rem;
 }
@@ -485,7 +487,7 @@ watch(itemsPerPage, (newVal, oldVal) => {
 }
 
 .gallery-controls {
-  max-width: 1200px;
+  max-width: 1000px;
   margin: 0 auto 3rem;
   display: flex;
   flex-direction: column;
@@ -551,9 +553,9 @@ watch(itemsPerPage, (newVal, oldVal) => {
 
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 2rem;
-  max-width: 1400px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 1rem;
 }
@@ -587,7 +589,7 @@ watch(itemsPerPage, (newVal, oldVal) => {
 
 /* Pagination */
 .pagination-container {
-  max-width: 1400px;
+  max-width: 1000px;
   margin: 3rem auto 2rem;
   padding: 0 1rem;
 }

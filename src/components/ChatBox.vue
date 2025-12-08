@@ -46,6 +46,20 @@ const llmService = useMock
 // Message ID counter
 let messageIdCounter = 0
 
+// Initialize counter based on existing messages to avoid ID collisions
+if (messages.value.length > 0) {
+  const ids = messages.value
+    .map(m => {
+      const parts = m.id.split('-')
+      return parts.length === 2 ? parseInt(parts[1]) : -1
+    })
+    .filter(n => !isNaN(n) && n >= 0)
+    
+  if (ids.length > 0) {
+    messageIdCounter = Math.max(...ids) + 1
+  }
+}
+
 // Send message
 async function sendMessage() {
   const userInput = input.value.trim()
@@ -201,20 +215,34 @@ onMounted(() => {
   // Load persisted config if available
   llmConfig.loadFromStorage()
   
-  // Show welcome message
+  // Handle Welcome Message
   const welcomeText = useMock 
     ? t('chat.welcomeDebug')
     : t('chat.welcome')
-  
-  const id = `msg-${messageIdCounter++}`
-  welcomeMessageId.value = id
 
-  chatStore.addMessage({
-    id: id,
-    text: welcomeText,
-    sender: 'oracle',
-    type: 'text'
-  })
+  if (messages.value.length === 0) {
+    // New session: Create welcome message
+    const id = `msg-${messageIdCounter++}`
+    welcomeMessageId.value = id
+
+    chatStore.addMessage({
+      id: id,
+      text: welcomeText,
+      sender: 'oracle',
+      type: 'text'
+      // We could add isWelcome: true here if we modified store, but heuristic is safer for now
+    })
+  } else {
+    // Existing session: Try to find the welcome message to keep it updated
+    // We assume the first message is the welcome message if it's from oracle and text type
+    const firstMessage = messages.value[0]
+    if (firstMessage && firstMessage.sender === 'oracle' && firstMessage.type === 'text') {
+       welcomeMessageId.value = firstMessage.id
+       
+       // Optional: Update text immediately in case language changed while away
+       chatStore.updateMessage(firstMessage.id, { text: welcomeText })
+    }
+  }
   
   // Auto-show modal if not configured (only in normal mode, not debug/mock mode)
   if (!useMock && !llmConfig.hasValidConfig) {
