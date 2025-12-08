@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useI18nStore } from '@/stores/i18n'
-import { FULL_DECK, getCardImage } from '@/utils/tarotUtils'
+import { FULL_DECK } from '@/utils/tarotUtils'
 import TarotCard from '@/components/TarotCard.vue'
 
 const router = useRouter()

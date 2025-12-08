@@ -24,7 +24,6 @@ export const useLLMConfigStore = defineStore('llmConfig', {
       return state.provider && state.apiKey.length > 0 && state.selectedModel.length > 0
     },
     isPersistent: (state) => state.persistKeys,
-    isPersistent: (state) => state.persistKeys,
   },
 
   actions: {

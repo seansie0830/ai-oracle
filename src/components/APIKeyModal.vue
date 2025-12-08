@@ -14,7 +14,7 @@ const emit = defineEmits(['close', 'save'])
 
 const llmConfig = useLLMConfigStore()
 const i18nStore = useI18nStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 // State
 const selectedProvider = ref('gemini')
@@ -56,7 +56,7 @@ const PROVIDERS = {
     placeholder: 'Enter your OpenRouter API key',
     helpUrl: 'https://openrouter.ai/keys'}
     
-  
+
 }
 
 // Computed
