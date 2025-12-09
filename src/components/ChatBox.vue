@@ -424,7 +424,7 @@ onMounted(() => {
           autocorrect="off"
           autocapitalize="off"
           spellcheck="false"
-          class="flex-1 rounded-2xl glass-panel py-3 px-4 sm:px-7
+          class="flex-1 rounded-2xl glass-panel lighter-input py-3 px-4 sm:px-7
                  border-2 border-[rgba(244,228,193,0.25)]
                  text-[var(--color-text-secondary)] text-base sm:text-lg
                  placeholder-[var(--color-text-tertiary)]/40
@@ -620,6 +620,13 @@ onMounted(() => {
   border-radius: 0.75rem;
   margin: 1em 0;
   box-shadow: 0 0 20px rgba(157, 78, 221, 0.3);
+}
+
+/* Slightly lighter input background */
+.lighter-input {
+  background: linear-gradient(135deg,
+    rgba(60, 50, 100, 0.5) 0%,
+    rgba(40, 40, 40, 0.7) 100%) !important;
 }
 </style>
 

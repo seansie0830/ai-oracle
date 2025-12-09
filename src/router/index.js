@@ -1,7 +1,8 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, createWebHashHistory } from 'vue-router'
+const isTauri = Object.prototype.hasOwnProperty.call(window, '__TAURI_INTERNALS__')
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: isTauri ? createWebHashHistory() : createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',

@@ -251,21 +251,23 @@ watch(itemsPerPage, (newVal, oldVal) => {
   <div class="gallery-page">
     <!-- Header -->
     <header class="gallery-header">
-      <button class="back-button" @click="goBack">
-        <span class="icon">←</span> {{ t('gallery.backToOracle') }}
-      </button>
-      
-      <div class="language-selector">
-        <button 
-          v-for="lang in availableLanguages" 
-          :key="lang.code"
-          class="lang-btn"
-          :class="{ active: currentLanguage === lang.code }"
-          @click="setLanguage(lang.code)"
-          :title="lang.name"
-        >
-          {{ lang.flag }}
+      <div class="header-top-row">
+        <button class="back-button" @click="goBack">
+          <span class="icon">←</span> {{ t('gallery.backToOracle') }}
         </button>
+        
+        <div class="language-selector">
+          <button 
+            v-for="lang in availableLanguages" 
+            :key="lang.code"
+            class="lang-btn"
+            :class="{ active: currentLanguage === lang.code }"
+            @click="setLanguage(lang.code)"
+            :title="lang.name"
+          >
+            {{ lang.flag }}
+          </button>
+        </div>
       </div>
 
       <h1 class="title">{{ t('gallery.title') }}</h1>
@@ -412,11 +414,20 @@ watch(itemsPerPage, (newVal, oldVal) => {
   position: relative;
 }
 
-.back-button {
+.header-top-row {
   position: absolute;
-  left: 0;
   top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   z-index: 10;
+  pointer-events: none;
+}
+
+.back-button {
+  pointer-events: auto;
   background: none;
   border: 1px solid rgba(244, 228, 193, 0.3);
   color: #f4e4c1;
@@ -435,10 +446,7 @@ watch(itemsPerPage, (newVal, oldVal) => {
 }
 
 .language-selector {
-  position: absolute;
-  right: 0;
-  top: 0;
-  z-index: 10;
+  pointer-events: auto;
   display: flex;
   gap: 0.5rem;
 }
@@ -717,6 +725,12 @@ watch(itemsPerPage, (newVal, oldVal) => {
 
 
 @media (max-width: 768px) {
+  .header-top-row {
+    position: relative;
+    margin-bottom: 1.5rem;
+    flex-direction: row; /* Keep them side-by-side or stack check? width is small... */
+  }
+
   .title {
     font-size: 2rem;
   }
