@@ -1,0 +1,3 @@
+name = "ai-oracle" # 這應該對應您在圖片中看到的名字
+compatibility_date = "2025-12-09"
+assets = { directory = "./dist" }
